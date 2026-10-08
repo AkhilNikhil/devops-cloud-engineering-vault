@@ -1,0 +1,7 @@
+*.zip
+*.tar.gz
+*.mp4
+*.iso
+*.exe
+node_modules/
+.DS_Store
