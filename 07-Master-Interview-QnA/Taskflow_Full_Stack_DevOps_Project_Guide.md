@@ -1,12 +1,12 @@
 # ==============================================================================
 # TASKFLOW (MYSQL 8.0 & NATIVE AUTH EDITION) - COMPLETE SINGLE-FILE PROJECT CODEBASE
 # ==============================================================================
-# Author / Engineer: Akhil BM
+# Author / Engineer: Senior DevOps Engineer
 # Architecture: MySQL 8.0 + Flask (Python 3.12) + React 19 / Vite + Nginx Reverse Proxy
 # Docker Hub Images:
-#   - akhilbm/taskflow-backend:v1.0 (and latest)
-#   - akhilbm/taskflow-frontend:v1.0 (and latest)
-# Super-Admin (Root Architect): akhilbm13@gmail.com
+#   - taskflow-org/taskflow-backend:v1.0 (and latest)
+#   - taskflow-org/taskflow-frontend:v1.0 (and latest)
+# Super-Admin (Root Architect): devops@example.com
 # Security & Auth: Werkzeug PBKDF2-SHA256 Password Hashing + Native HS256 JWT
 # Scope: Clean, 100% Self-Contained Task & Team Workspace (Zero Chat/Email bloat)
 # ==============================================================================
@@ -63,7 +63,7 @@ TaskFlow MySQL Edition is an enterprise task management and team collaboration p
 │   ┌────────────────────────────────────────────────────────────────┐   │
 │   │ 🌐 Service 1: FRONTEND CONTAINER (Nginx Alpine + React 19)      │   │
 │   │   • Container: taskflow-mysql-frontend                         │   │
-│   │   • Image: akhilbm/taskflow-frontend:v1.0                      │   │
+│   │   • Image: taskflow-org/taskflow-frontend:v1.0                      │   │
 │   │   • Internal Proxy: location /api/ -> http://backend:5000;     │   │
 │   │   • Benefit: Relative API routing makes app immune to EC2 IPs. │   │
 │   └───────────────────────────────┬────────────────────────────────┘   │
@@ -73,7 +73,7 @@ TaskFlow MySQL Edition is an enterprise task management and team collaboration p
 │   ┌────────────────────────────────────────────────────────────────┐   │
 │   │ ⚙️ Service 2: BACKEND CONTAINER (Flask 3.1 + Gunicorn)         │   │
 │   │   • Container: taskflow-mysql-backend                          │   │
-│   │   • Image: akhilbm/taskflow-backend:v1.0                       │   │
+│   │   • Image: taskflow-org/taskflow-backend:v1.0                       │   │
 │   │   • Native Auth: Werkzeug PBKDF2-SHA256 password hashing       │   │
 │   │   • Native Tokens: PyJWT HS256 stateless session issuance      │   │
 │   │   • Schema Sync: MySQL GET_LOCK advisory lock serializes DDL   │   │
@@ -155,7 +155,7 @@ MYSQL_PASSWORD=<CHANGE_ME_STRONG_APP_PASSWORD>
 MYSQL_PORT=3306
 
 # Super-Admin (Root Architect)
-ROOT_ARCHITECT_EMAIL=akhilbm13@gmail.com
+ROOT_ARCHITECT_EMAIL=devops@example.com
 
 # Native Authentication Security (Must be 32+ cryptographically random characters)
 JWT_SECRET=<CHANGE_ME_SECURE_RANDOM_JWT_SECRET_KEY>
@@ -267,7 +267,7 @@ services:
       start_period: 15s
 
   backend:
-    image: akhilbm/taskflow-backend:v1.0
+    image: taskflow-org/taskflow-backend:v1.0
     container_name: taskflow-mysql-backend
     restart: unless-stopped
     depends_on:
@@ -283,7 +283,7 @@ services:
       - "${BACKEND_PORT:-5000}:5000"
 
   frontend:
-    image: akhilbm/taskflow-frontend:v1.0
+    image: taskflow-org/taskflow-frontend:v1.0
     container_name: taskflow-mysql-frontend
     restart: unless-stopped
     depends_on:
@@ -5262,7 +5262,7 @@ MYSQL_USER=taskflow
 MYSQL_PASSWORD=<GENERATE_STRONG_APP_PASSWORD>
 
 # Super-Admin Configuration
-ROOT_ARCHITECT_EMAIL=akhilbm13@gmail.com
+ROOT_ARCHITECT_EMAIL=devops@example.com
 
 # JWT Secret Key (Use a cryptographically secure random string)
 JWT_SECRET=$(openssl rand -hex 32)
@@ -5299,7 +5299,7 @@ services:
       start_period: 15s
 
   backend:
-    image: akhilbm/taskflow-backend:v1.0
+    image: taskflow-org/taskflow-backend:v1.0
     container_name: taskflow-mysql-backend
     restart: unless-stopped
     depends_on:
@@ -5315,7 +5315,7 @@ services:
       - "${BACKEND_PORT:-5000}:5000"
 
   frontend:
-    image: akhilbm/taskflow-frontend:v1.0
+    image: taskflow-org/taskflow-frontend:v1.0
     container_name: taskflow-mysql-frontend
     restart: unless-stopped
     depends_on:
@@ -5388,4 +5388,4 @@ Then navigate to `http://localhost:8081` in your local browser to inspect MySQL 
 > *"Exposing database administration interfaces directly to the public internet creates an immediate attack vector for credential brute-forcing. In our production Docker Compose topology, Adminer is bound strictly to the host loopback interface (`127.0.0.1:8081:8080`), leaving port 8081 closed in the AWS Security Group. Authorized engineers access Adminer through an encrypted SSH tunnel (`ssh -L 8081:localhost:8081`), ensuring zero public exposure while retaining full debugging visibility."*
 
 ---
-*Created and verified by Akhil BM. 100% operational.*
+*Created and verified by Senior DevOps Engineer. 100% operational.*

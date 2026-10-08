@@ -2244,8 +2244,8 @@ Control Plane Control: Unlike AWS EKS (which abstracts the control plane), kOps 
 
 ### Q289. What are the steps to create a cluster using kOps?
 
-Step 1: Create a versioned S3 bucket to act as the kOps cluster state store (`aws s3 mb s3://akhil-kops-state-store`).
-Step 2: Export configuration environments: `export KOPS_STATE_STORE=s3://akhil-kops-state-store` and `export NAME=myapp.k8s.local`.
+Step 1: Create a versioned S3 bucket to act as the kOps cluster state store (`aws s3 mb s3://devops-kops-state-store`).
+Step 2: Export configuration environments: `export KOPS_STATE_STORE=s3://devops-kops-state-store` and `export NAME=myapp.k8s.local`.
 Step 3: Define the configuration file: `kops create cluster --name=${NAME} --zones=us-east-1a --node-count=2 --node-size=t2.medium --master-size=t2.medium`.
 Step 4: Provision cloud architecture: `kops update cluster --name=${NAME} --yes`.
 Step 5: Wait and validate: `kops validate cluster --wait 10m`.
@@ -2274,7 +2274,7 @@ Storage: EBS volumes for etcd data and node OS drives.
 
 ### Q293. How did you store kOps state in your project?
 
-S3 State Bucket: Stored in a versioned S3 bucket (`s3://akhil-kops-state-store`).
+S3 State Bucket: Stored in a versioned S3 bucket (`s3://devops-kops-state-store`).
 Contents: Stores configuration files, PKI credentials, encryption keys, and node group limits.
 Disaster Recovery: Since cluster configurations exist inside S3, if our local management machine dies, we can reconstruct the cluster from S3 state effortlessly.
 
@@ -3286,7 +3286,7 @@ id devops# uid=1001(devops) gid=1001(devops) groups=1001(devops),27(sudo)
 Option 1 (getent): Run 'getent group [groupname]' to query the database and list all members of the group.
 Option 2 (grep): Query the local /etc/group file directly: 'grep "^[groupname]:" /etc/group'.
 Why getent is better: 'getent' is preferred because it queries the Name Service Switch (NSS), meaning it works for local files as well as network identity providers like LDAP or Active Directory, whereas grep only reads the local file.
-getent group docker# docker:x:998:devops,akhil
+getent group docker# docker:x:998:devops,devops
 
 ## Section 3: File & Directory Management
 
@@ -4934,7 +4934,7 @@ GitOps Definition: An operational model where Git serves as the single source of
 * Flux: A lightweight, secure, and native GitOps controller for multi-cluster environments.
 
 > 💡 **Key Takeaway / Analogy:**
-> # Example ArgoCD Application resourceapiVersion: argoproj.io/v1alpha1kind: Applicationmetadata:  name: todo-app  namespace: argocdspec:  project: default  source:    repoURL: https://github.com/akhilbm/myapp-k8s-manifests    targetRevision: main    path: manifests/  destination:    server: https://kubernetes.default.svc    namespace: default  syncPolicy:    automated:      prune: true      # auto-delete resources removed from Git      selfHeal: true   # auto-revert manual changes in cluster
+> # Example ArgoCD Application resourceapiVersion: argoproj.io/v1alpha1kind: Applicationmetadata:  name: todo-app  namespace: argocdspec:  project: default  source:    repoURL: https://github.com/devopsbm/myapp-k8s-manifests    targetRevision: main    path: manifests/  destination:    server: https://kubernetes.default.svc    namespace: default  syncPolicy:    automated:      prune: true      # auto-delete resources removed from Git      selfHeal: true   # auto-revert manual changes in cluster
 
 
 #### DEVOPS & CLOUD ENGINEERINGMASTER STUDY NOTES
@@ -4980,7 +4980,7 @@ Policies: IAM Policies: JSON structures defining explicit permissions via Effect
 
 
 > 💡 **Key Takeaway / Analogy:**
-> {  "Version": "2012-10-17",  "Statement": [    {      "Effect": "Allow",      "Action": [        "s3:GetObject",        "s3:PutObject"      ],      "Resource": "arn:aws:s3:::akhil-devops-bucket/*"    }  ]}
+> {  "Version": "2012-10-17",  "Statement": [    {      "Effect": "Allow",      "Action": [        "s3:GetObject",        "s3:PutObject"      ],      "Resource": "arn:aws:s3:::devops-devops-bucket/*"    }  ]}
 
 1.3 Virtual Servers (EC2) & Storage Volumes (EBS)
 EC2: Elastic Compute Cloud: Secure, resizable virtual servers. You define the OS family, CPU, memory, network interfaces, and storage disks.
@@ -5154,7 +5154,7 @@ Definition: A text file containing Groovy code that defines your entire pipeline
 Declarative Pipeline Example:
 
 > 💡 **Key Takeaway / Analogy:**
-> // Jenkinsfile (Declarative Pipeline)pipeline {    agent any    environment {        DOCKER_HUB_CREDS = credentials('docker-hub-credentials')        IMAGE_NAME = "akhil/myapp"        IMAGE_TAG = "${BUILD_NUMBER}"    }    triggers {        githubPush() // Automatically build on every GitHub commit    }    stages {        stage('Checkout') {            steps {                git branch: 'main', url: 'https://github.com/akhil/myapp.git'            }        }        stage('Build Code') {            steps {                sh 'mvn clean package -DskipTests'            }        }        stage('Test Code') {            steps {                sh 'mvn test'            }        }    }    post {        always {            sh 'docker image prune -f' // Clean up intermediate images        }    }}
+> // Jenkinsfile (Declarative Pipeline)pipeline {    agent any    environment {        DOCKER_HUB_CREDS = credentials('docker-hub-credentials')        IMAGE_NAME = "devops/myapp"        IMAGE_TAG = "${BUILD_NUMBER}"    }    triggers {        githubPush() // Automatically build on every GitHub commit    }    stages {        stage('Checkout') {            steps {                git branch: 'main', url: 'https://github.com/devops/myapp.git'            }        }        stage('Build Code') {            steps {                sh 'mvn clean package -DskipTests'            }        }        stage('Test Code') {            steps {                sh 'mvn test'            }        }    }    post {        always {            sh 'docker image prune -f' // Clean up intermediate images        }    }}
 
 
 ### Q4. What are the common stages of a robust CI/CD Pipeline?
@@ -5188,7 +5188,7 @@ withCredentials Block: Temporarily exposes secrets inside a secure execution she
 Usage Example:
 
 > 💡 **Key Takeaway / Analogy:**
-> stage('Docker Login & Push') {    steps {        withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials',                                           passwordVariable: 'DOCKER_PSW',                                           usernameVariable: 'DOCKER_USR')]) {            sh 'echo $DOCKER_PSW | docker login -u $DOCKER_USR --password-stdin'            sh 'docker push akhil/myapp:1.0'        }    }}
+> stage('Docker Login & Push') {    steps {        withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials',                                           passwordVariable: 'DOCKER_PSW',                                           usernameVariable: 'DOCKER_USR')]) {            sh 'echo $DOCKER_PSW | docker login -u $DOCKER_USR --password-stdin'            sh 'docker push devops/myapp:1.0'        }    }}
 
 
 ### Q8. Describe Jenkins Master and Agent (Controller-Worker) Architecture.
@@ -5227,7 +5227,7 @@ Major Benefits:  * Local Autonomy: Most operations (committing, branching, log v
 
 ### Q3. What are the core commands for basic local configurations and repositories?
 
-Set Identity (required before creating first commit) [45, 201]:  * `git config --global user.name "[Candidate Name]"` [46, 202]  * `git config --global user.email "akhilbm13@gmail.com"` [46, 202]
+Set Identity (required before creating first commit) [45, 201]:  * `git config --global user.name "[Candidate Name]"` [46, 202]  * `git config --global user.email "devops@example.com"` [46, 202]
 Start Repository:  * `git init`: Initializes a brand new Git repo in the current folder, creating a hidden `.git/` database directory [46, 375, 568].  * `git clone <url>`: Copies an existing remote project onto your local machine, setting up upstream origins [46, 376, 569].
 Stage & Commit Changes:  * `git status`: Checks modified files and shows staging status [68, 224, 570].  * `git add .`: Stages all local additions, modifications, and deletions in the directory [68, 224, 570].  * `git commit -m "Commit message"`: Commits currently staged items with a descriptive summary [47, 203, 570].  * `git commit --amend`: Modifies the last unpushed commit message or injects missed file additions directly [47, 203, 570].
 
@@ -5297,7 +5297,7 @@ Architecture Layers:  * Hardware: Core execution resources: CPU, RAM, disk, netw
 
 ### Q2. Break down the Linux File System Structure starting from root (/).
 
-Top Level:  * `/`: Root directory. Starting point of the entire directory tree [76, 232].  * `/bin/`: Essential system binary commands accessible to all users (e.g., `ls`, `cp`, `mv`, `cat`) [76, 232].  * `/sbin/`: Critical administrative system binaries reserved for root/sudo access (e.g., `fdisk`, `mount`) [76, 232].  * `/etc/`: Housed configuration files for the OS and installed services (e.g., `/etc/passwd`, `/etc/nginx/nginx.conf`) [76, 78, 232, 234].  * `/var/`: Variable data files, dynamically written while system is running [77, 233].    * `/var/log/`: Central repository for all application, kernel, and system log files [77, 78, 233, 234].  * `/home/`: Base folder for user home directories (e.g., `/home/akhil` where personal files are kept) [77, 78, 233, 234].  * `/root/`: Home directory for the root superuser [77, 233].  * `/tmp/`: Stores temporary files, which are automatically purged/deleted on system reboot [77, 78, 233, 234].  * `/usr/`: Stores user applications, shared libraries, and secondary command binaries (`/usr/bin/`) [77, 233].  * `/opt/`: Designated directory for third-party or manually compiled application packages [77, 233].  * `/proc/`: A virtual, pseudo-filesystem generated dynamically by the kernel containing real-time process and resource metrics [78, 234].
+Top Level:  * `/`: Root directory. Starting point of the entire directory tree [76, 232].  * `/bin/`: Essential system binary commands accessible to all users (e.g., `ls`, `cp`, `mv`, `cat`) [76, 232].  * `/sbin/`: Critical administrative system binaries reserved for root/sudo access (e.g., `fdisk`, `mount`) [76, 232].  * `/etc/`: Housed configuration files for the OS and installed services (e.g., `/etc/passwd`, `/etc/nginx/nginx.conf`) [76, 78, 232, 234].  * `/var/`: Variable data files, dynamically written while system is running [77, 233].    * `/var/log/`: Central repository for all application, kernel, and system log files [77, 78, 233, 234].  * `/home/`: Base folder for user home directories (e.g., `/home/devops` where personal files are kept) [77, 78, 233, 234].  * `/root/`: Home directory for the root superuser [77, 233].  * `/tmp/`: Stores temporary files, which are automatically purged/deleted on system reboot [77, 78, 233, 234].  * `/usr/`: Stores user applications, shared libraries, and secondary command binaries (`/usr/bin/`) [77, 233].  * `/opt/`: Designated directory for third-party or manually compiled application packages [77, 233].  * `/proc/`: A virtual, pseudo-filesystem generated dynamically by the kernel containing real-time process and resource metrics [78, 234].
 
 ### Q3. What are the key distinctions between User Classifications and User Management?
 
@@ -5314,7 +5314,7 @@ Key Command Set:  * `useradd -m <name>`: Creates a new user with a home director
 Permission Structure: Every file and folder contains three permission blocks: Owner (User), Group, and Others (World) [86, 242, 664]. Each block consists of `r` (read), `w` (write), and `x` (execute) [86, 242, 664].
 Octal Values:  * `r` (read) = 4 [86, 242, 664]  * `w` (write) = 2 [86, 242, 664]  * `x` (execute) = 1 [86, 242, 664]  * `rwx` = 4+2+1 = 7 (Full permissions) [87, 243, 665]  * `rw-` = 4+2+0 = 6 (Read & Write) [87, 243, 666]  * `r-x` = 4+0+1 = 5 (Read & Execute) [87, 243, 666]  * `r--` = 4+0+0 = 4 (Read Only) [87, 243, 666]  * `---` = 0+0+0 = 0 (No permissions) [87, 243, 666]
 Standard Permissions:  * `755` (`rwxr-xr-x`): Owner has full access; group and others can read and execute [87, 243, 667]. Ideal for shell scripts and directories [87, 243, 667].  * `644` (`rw-r----`): Owner can read and write; group and others can read only [87, 243, 668]. Standard for text files, configuration files (e.g., `nginx.conf`), and logs [87, 243, 668].  * `600` (`rw-------`): Only the owner can read and write [87, 243, 666]. Required for securing private SSH keys (`~/.ssh/id_rsa`) [87, 243, 666].
-Modification Commands:  * `chmod 755 script.sh`: Changes file mode permissions [87, 243, 666]. Use `-R` for recursive changes to subdirectories [88, 244].  * `chown akhil:devops file.txt`: Changes both file owner (akhil) and group (devops) [89, 245, 669]. Use `-R` recursively [89, 245, 669].
+Modification Commands:  * `chmod 755 script.sh`: Changes file mode permissions [87, 243, 666]. Use `-R` for recursive changes to subdirectories [88, 244].  * `chown devops:devops file.txt`: Changes both file owner (devops) and group (devops) [89, 245, 669]. Use `-R` recursively [89, 245, 669].
 
 ### Q6. What is an ACL (setfacl/getfacl) and when do you use it?
 
@@ -5386,7 +5386,7 @@ Remote Backend Setup (Teams):  * S3 Bucket: Stores the state file in a centraliz
 Backend Configuration Example:
 
 > 💡 **Key Takeaway / Analogy:**
-> # backend.tfterraform {    backend "s3" {        bucket         = "akhil-terraform-state-bucket"        key            = "production/vpc/terraform.tfstate"        region         = "us-east-1"        encrypt        = true        dynamodb_table = "terraform-locks" // For State Locking    }}
+> # backend.tfterraform {    backend "s3" {        bucket         = "devops-terraform-state-bucket"        key            = "production/vpc/terraform.tfstate"        region         = "us-east-1"        encrypt        = true        dynamodb_table = "terraform-locks" // For State Locking    }}
 
 
 ### Q5. What are Input Variables, Outputs, and Local Values?
