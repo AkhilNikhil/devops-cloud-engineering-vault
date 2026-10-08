@@ -5227,7 +5227,7 @@ Major Benefits:  * Local Autonomy: Most operations (committing, branching, log v
 
 ### Q3. What are the core commands for basic local configurations and repositories?
 
-Set Identity (required before creating first commit) [45, 201]:  * `git config --global user.name "Akhil B M"` [46, 202]  * `git config --global user.email "akhilbm13@gmail.com"` [46, 202]
+Set Identity (required before creating first commit) [45, 201]:  * `git config --global user.name "[Candidate Name]"` [46, 202]  * `git config --global user.email "akhilbm13@gmail.com"` [46, 202]
 Start Repository:  * `git init`: Initializes a brand new Git repo in the current folder, creating a hidden `.git/` database directory [46, 375, 568].  * `git clone <url>`: Copies an existing remote project onto your local machine, setting up upstream origins [46, 376, 569].
 Stage & Commit Changes:  * `git status`: Checks modified files and shows staging status [68, 224, 570].  * `git add .`: Stages all local additions, modifications, and deletions in the directory [68, 224, 570].  * `git commit -m "Commit message"`: Commits currently staged items with a descriptive summary [47, 203, 570].  * `git commit --amend`: Modifies the last unpushed commit message or injects missed file additions directly [47, 203, 570].
 
@@ -5774,47 +5774,4 @@ NAT & PAT Translations: Network Address Translation maps private internal IPs to
 #### SECTION 11: YOUR INTRODUCTION — POLISHED VERSIONS
 
 
-#### 11.1 Version 1: Technical & Detailed Pitch (Senior/Technical Roles)
-
-
-> 💡 **Key Takeaway / Analogy:**
-> "Good morning. My name is Akhil B M, and I'm from Chitradurga, Karnataka.I recently completed my Bachelor of Engineering in Information Science and Engineering from BMS Institute of Technology, Bangalore.I have hands-on experience in DevOps and cloud engineering through my training and projects, working extensively with AWS services including EC2, S3, IAM, VPC, and Load Balancers, alongside strong Linux system administration and shell scripting skills. I'm also proficient in DevOps tools including Git, Jenkins, Docker, Kubernetes, and Terraform.In one of my key projects, I built a multi-tier Todo application where I containerized a Node.js backend and Apache frontend using Docker, deployed the application on a Kubernetes cluster provisioned on AWS using kOps, and implemented StatefulSets with persistent EBS storage for the database tier to ensure zero data loss.In another project, I architected a production-grade multi-instance Tomcat environment on an Azure VM, using Apache as a Reverse Proxy to route traffic across isolated Tomcat instances running on custom ports. I fully automated the entire deployment using Azure DevOps CI/CD pipelines with self-hosted agents, and integrated the LGTM stack — Loki, Grafana, Tempo, and Mimir — to monitor application health in real time. I also managed the full project lifecycle through a structured hierarchy of Epics and Features in Azure Boards to maintain complete traceability.I'm passionate about cloud infrastructure and automation, a quick learner, and eager to contribute to an organization where I can solve real-world infrastructure challenges while continuing to grow technically."
-
-
-#### 11.2 Version 2: Concise Pitch (HR Rounds / Phone Screens)
-
-
-> 💡 **Key Takeaway / Analogy:**
-> "Good morning. I'm Akhil B M, from Chitradurga, Karnataka.I hold a B.E. in Information Science from BMS Institute of Technology, Bangalore.I have hands-on experience in cloud and DevOps through training and real projects — working with AWS, Azure DevOps, Docker, Kubernetes, and Terraform. I've built CI/CD pipelines, deployed containerized applications on Kubernetes, set up reverse proxy architectures on Azure, and implemented monitoring using the LGTM stack.I'm a quick learner who's passionate about automation and cloud infrastructure, and I'm looking to join a team where I can apply my skills and grow in a real-world DevOps environment."
-
-
-#### 11.3 Version 3: Azure-Focused Pitch (Azure/Microsoft Cloud Roles)
-
-
-> 💡 **Key Takeaway / Analogy:**
-> "Good morning. I'm Akhil B M from Chitradurga, Karnataka.I recently completed my B.E. in Information Science from BMS Institute of Technology, Bangalore.I have hands-on experience with Azure services including Virtual Machines, VNets, and Network Security Groups, along with CI/CD automation using Azure DevOps. I configured self-hosted agents, built multi-stage YAML pipelines, and managed project workflows using Azure Boards with Epics, Features, and Tasks to ensure full traceability.One of my key projects involved deploying multiple Tomcat instances behind an Apache Reverse Proxy on an Azure VM, with automated deployments through Azure DevOps and real-time monitoring using Grafana and Loki. I'm eager to grow my Azure skills further and contribute to cloud operations in a professional environment."
-
-
-#### 11.4 Key Pitching Guidelines & Mock Interview Follow-up QA
-
-Core Introduction Rules: When delivering your pitch, maintain a strong, confident posture and prioritize your projects over general declarations. Practice delivering each pitch out loud.
-Project 1 Explanation Support: Ensure you can explain kOps cluster creations, StatefulSet volumes, and Flannel node network paths. Highlight self-healing microservice replicas.
-Project 2 Explanation Support: Be ready to trace Tomcat deployments. Highlight self-hosted agents, ProxyPass configurations, and Grafana dashboard alerts.
-Mock Interview Practice Questions & Ideal Answers: Common follow-up scenarios to practice:
-
-### Q1. Can you explain the architecture of your Azure project?
-
-Answer: I set up two isolated Tomcat instances on an Azure VM. I configured Apache as a Reverse Proxy on Port 80, routing traffic to Tomcat instances running on custom ports 7789 and 8888 using ProxyPass rules. I automated deployments using a multi-stage Azure DevOps pipeline on a self-hosted agent installed directly on the VM, so merges to main automatically deployed the built WAR file to Tomcat. Logs were parsed and labeled by Promtail and shipped to Grafana Loki.
-
-### Q2. What is your biggest strength?
-
-Answer: My biggest strength is my ability to connect multiple DevOps tools into a working, automated system. I don't look at tools like Docker, Git, Jenkins, or Prometheus in isolation. I design and build end-to-end pipelines that connect them. I also excel at structured debugging, tracing errors from application logs back to firewall blocks or VPC routing issues.
-
-### Q3. Where do you see yourself in 2 years?
-
-Answer: In two years, I see myself as a highly confident, senior DevOps or Cloud Engineer, designing production-grade, highly available, and secure infrastructure. I aim to master advanced cloud architectures (EKS, AKS, Azure Bicep, Terraform workspaces) and GitOps practices using ArgoCD, taking full ownership of automated pipelines and site reliability.
-
-#### 11.5 Job Search Strategy & Resume Keywords
-
-Core Job Platforms: Focus applications on Bengaluru-centric markets using LinkedIn Jobs ('DevOps Engineer Fresher Bangalore'), Naukri.com, Instahyre (excellent for tech startups), and Wellfound.
-Keywords to Inject in Resume: Your resume must contain: AWS, Azure DevOps, Docker, Kubernetes, kOps, Terraform, Ansible, Jenkins, CI/CD, YAML Pipelines, Linux, Git, Apache, Tomcat, LGTM Stack, Grafana, Loki, Promtail, Python, Bash, Shell Scripting.
+#
