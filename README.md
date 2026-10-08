@@ -27,7 +27,7 @@ flowchart LR
 * **Phase 4 (Cloud Architecture):** [03-AWS-Cloud-Architecture](#-03-aws-cloud-architecture) ➔ Multi-tier VPC isolation, IMDSv2 token security, EBS `gp3`, S3 lifecycle rules, IAM least privilege, RDS/Aurora, and FinOps cost optimization.
 * **Phase 5 (Infrastructure as Code):** [04-Terraform-IaC](#-04-terraform-iac) ➔ Modern Terraform 1.5+ (`import`, `moved`), AWS Provider v5.x decoupled resources, S3 backend with DynamoDB state locking, and disaster recovery.
 * **Phase 6 (Automation & Multi-Cloud):** [05-CICD-Jenkins-Automation](#-05-cicd-jenkins-automation) & [08-Azure-DevOps-Engineering](#-08-azure-devops-engineering) ➔ Declarative Jenkinsfiles, SonarQube quality gates, Nexus publishing, Azure Boards, multi-stage YAML pipelines, and self-hosted Linux agent pools.
-* **Phase 7 (Hands-On Coding Drill):** [HANDS_ON_CODE_PRACTICE.md](07-Master-Interview-QnA/HANDS_ON_CODE_PRACTICE.md) ➔ Write production Dockerfiles, Compose specs, K8s manifests, Terraform HCL, and Jenkinsfiles from memory without looking at notes.
+* **Phase 7 (Hands-On Coding Drill):** HANDS_ON_CODE_PRACTICE.md (Local Practice Workbook) ➔ Write production Dockerfiles, Compose specs, K8s manifests, Terraform HCL, and Jenkinsfiles from memory without looking at notes.
 * **Phase 8 (Master Technical Review):** [640QA_Master_Systems_Engineering_Guide.md](07-Master-Interview-QnA/640QA_Master_Systems_Engineering_Guide.md) ➔ The complete 640-question technical interview encyclopedia spanning all 12 engineering domains.
 
 ---
