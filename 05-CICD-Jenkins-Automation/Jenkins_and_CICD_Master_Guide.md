@@ -1,286 +1,395 @@
 # 🚀 CI/CD Automation: Jenkins & Ansible Master Engineering Guide
 
 > **Authoritative Master Reference & Senior Technical Interview Playbook**  
-> Covers CI/CD Pipeline Automation, Declarative Jenkinsfile Engineering, Distributed Controller-Agent Architecture, GitHub Webhooks, Credentials Security, Ansible Agentless Configuration Management, Playbooks, Jinja2 Templating, Roles, and Ansible Vault.
+> Covers CI/CD Pipeline Automation, Controller-Agent Architecture, The 5 Jenkins Build Triggers, Cron Scheduling & Weather Reports, The Production `/tmp` Low Memory Out-of-Space Crisis Resolution, Maven Lifecycle & Nexus Publishing, Declarative Jenkinsfile Engineering, Role-Based Access Control, Ansible Agentless Configuration Management, Playbooks, Jinja2 Templating, and Ansible Vault.
 
 ---
 
 ## 📑 Table of Contents
-- [1. Jenkins Core Architecture & Controller-Agent Model](#1-jenkins-core-architecture--controller-agent-model)
-- [2. Jenkins Job Types & Declarative vs Scripted Pipelines](#2-jenkins-job-types--declarative-vs-scripted-pipelines)
-- [3. Complete Production Declarative `Jenkinsfile`](#3-complete-production-declarative-jenkinsfile)
-- [4. CI/CD Pipeline Stages & Webhook Triggers](#4-cicd-pipeline-stages--webhook-triggers)
-- [5. Credentials Management & Secret Masking](#5-credentials-management--secret-masking)
-- [6. Jenkins Shared Libraries (Enterprise Code Reuse)](#6-jenkins-shared-libraries-enterprise-code-reuse)
-- [7. Ansible Architecture & Agentless Engine](#7-ansible-architecture--agentless-engine)
-- [8. Ansible Inventory Management (INI & YAML)](#8-ansible-inventory-management-ini--yaml)
-- [9. Ad-Hoc Commands & Core Modules Reference](#9-ad-hoc-commands--core-modules-reference)
-- [10. Playbooks, Handlers, Loops, & Conditionals](#10-playbooks-handlers-loops--conditionals)
-- [11. Jinja2 Templating & Dynamic Configurations](#11-jinja2-templating--dynamic-configurations)
-- [12. Reusable Ansible Roles](#12-reusable-ansible-roles)
-- [13. Ansible Vault: Production Secret Encryption](#13-ansible-vault-production-secret-encryption)
+- [1. Jenkins Origins & Controller-Agent Architecture](#1-jenkins-origins--controller-agent-architecture)
+- [2. The 5 Jenkins Build Trigger Types](#2-the-5-jenkins-build-trigger-types)
+- [3. Jenkins Cron Scheduling & Weather Report Indicators](#3-jenkins-cron-scheduling--weather-report-indicators)
+- [4. Production Crisis Resolution: The Jenkins `/tmp` Low Memory Issue](#4-production-crisis-resolution-the-jenkins-tmp-low-memory-issue)
+- [5. Maven Lifecycle, Artifact Formats, & Nexus Publishing](#5-maven-lifecycle-artifact-formats--nexus-publishing)
+- [6. Jenkins Security: Role-Based Authorization Strategy](#6-jenkins-security-role-based-authorization-strategy)
+- [7. Declarative vs Scripted Pipelines](#7-declarative-vs-scripted-pipelines)
+- [8. Complete Production Declarative `Jenkinsfile` Blueprint](#8-complete-production-declarative-jenkinsfile-blueprint)
+- [9. Continuous Delivery vs Continuous Deployment](#9-continuous-delivery-vs-continuous-deployment)
+- [10. Ansible Architecture & Agentless Operations](#10-ansible-architecture--agentless-operations)
+- [11. Ansible Inventory Management & Ad-Hoc Commands](#11-ansible-inventory-management--ad-hoc-commands)
+- [12. Ansible Playbooks, Handlers, & Jinja2 Templating](#12-ansible-playbooks-handlers--jinja2-templating)
+- [13. Ansible Vault Secret Encryption](#13-ansible-vault-secret-encryption)
 - [14. Senior DevOps Interview Q&A](#14-senior-devops-interview-qa)
 
 ---
 
-## 1. Jenkins Core Architecture & Controller-Agent Model
+## 1. Jenkins Origins & Controller-Agent Architecture
 
-### System Architecture
+### Origins & Evolution
+* **Hudson (2004)**: Created by Kohsuke Kawaguchi at Sun Microsystems as an open-source Java continuous integration server.
+* **The Jenkins Fork (2011)**: Following Oracle's acquisition of Sun Microsystems, a trademark dispute led the community and Kohsuke to fork Hudson into **Jenkins**, which became the dominant open-source CI/CD platform globally.
+
+### System Architecture: Controller & Distributed Agents
 ```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                       JENKINS CONTROLLER (Master)                           │
+│                       JENKINS CONTROLLER (Master Node)                      │
 │                                                                             │
-│   • Web Dashboard & HTTP GUI                • Stores Job Configurations     │
-│   • Monitors SCM & GitHub Webhooks          • Dispatches Builds to Agents   │
-│   • Stores Build Logs & Test Reports        • Manages Plugins & Security    │
+│   • Web Dashboard UI & API Endpoints         • Manages Job Configurations   │
+│   • Receives GitHub Webhook Payloads         • Dispatches Builds to Agents  │
+│   • Stores Build History & Artifact Logs     • Manages Plugins & Security   │
 └───────────────────────┬─────────────────────────────┬───────────────────────┘
-                        │ SSH / JNLP (Inbound TCP)    │ Dynamic Pod Provisioning
+                        │ SSH / JNLP (Port 50000)     │ Kubernetes Cloud Plugin
                         ▼                             ▼
 ┌───────────────────────────────────────┐ ┌───────────────────────────────────┐
-│           Static Worker Agent         │ │     Dynamic Kubernetes Pod Agent  │
-│         (Dedicated Linux EC2)         │ │     (Spun up on-demand, torn down)│
+│         Static EC2 Linux Agent        │ │    Dynamic Ephemeral K8s Pod Agent│
 │                                       │ │                                   │
-│   • Builds Docker Images              │ │   • Container 1: maven / node     │
-│   • Runs Unit & Integration Tests     │ │   • Container 2: docker-cli       │
-│   • Executes Security Scanners        │ │   • Container 3: kubectl / helm   │
+│   • Dedicated VM with Java Agent      │ │   • Container 1: maven / node     │
+│   • Executes Heavy Builds & Tests     │ │   • Container 2: docker-cli       │
+│   • Builds and Pushes Docker Images   │ │   • Container 3: kubectl / helm   │
+│   • Cleans Workspace Post-Build       │ │   • Destroyed immediately on exit │
 └───────────────────────────────────────┘ └───────────────────────────────────┘
 ```
 
-### Core Architecture Rules
-* **Never Run Builds on Controller**: The controller handles scheduling, webhooks, and UI. Heavy builds on the controller exhaust CPU/memory and crash Jenkins.
-* **Distributed Agent Types**:
-  * **Static SSH Agents**: Dedicated EC2 instances with Java agent running.
-  * **Dynamic Kubernetes Cloud Agents**: Controller spins up an isolated pod for each pipeline stage and immediately tears it down after completion (100% ephemeral).
+### Golden Operational Rules
+* **Never Run Builds on Controller**:
+  * The controller coordinates scheduling, webhooks, and UI.
+  * Running compilers and Docker builds on the controller exhausts memory/CPU, freezing the UI and dropping cluster webhooks.
+* **Controller-Agent Connection Types**:
+  * **SSH (Outbound from Controller)**: Controller connects directly to agent via private SSH key.
+  * **Inbound JNLP / TCP (Port 50000)**: Agent initiates connection back to controller (ideal for agents behind firewalls or private subnets).
 
 ---
 
-## 2. Jenkins Job Types & Declarative vs Scripted Pipelines
+## 2. The 5 Jenkins Build Trigger Types
 
-### Comparison Matrix
+Understanding how and when Jenkins triggers builds is a critical system administration topic.
 
-| Feature | Declarative Pipeline (`pipeline { ... }`) | Scripted Pipeline (`node { ... }`) |
-| :--- | :--- | :--- |
-| **Syntax** | Structured, opinionated, easy to read | Groovy code, complex, imperatively programmed |
-| **Error Handling** | Native `post { always, success, failure }` | Requires standard Groovy `try-catch-finally` |
-| **Restart from Stage** | Native built-in support | Not supported out-of-the-box |
-| **Extensibility** | Supports embedded `script { ... }` blocks | Unlimited Groovy language flexibility |
-| **Industry Adoption**| **Standard for 95% of enterprise pipelines** | Legacy or highly dynamic bespoke pipelines |
+```text
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                       THE 5 JENKINS BUILD TRIGGERS                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 1. GitHub Hook Trigger for GITScm  │ Instant event-driven push via Webhooks │
+│ 2. Poll SCM                        │ Scheduled check for Git commits (diff) │
+│ 3. Build Periodically              │ Scheduled cron build unconditionally   │
+│ 4. Build After Other Projects      │ Upstream / Downstream pipeline chain   │
+│ 5. Trigger Builds Remotely         │ HTTP API call via authentication token │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Detailed Breakdown of Each Trigger
+
+#### 1. GitHub Hook Trigger for GITScm Polling (Webhooks)
+* **Mechanism**: Event-driven. When a developer pushes commits to GitHub or opens a pull request, GitHub instantly sends an HTTP `POST` JSON payload to Jenkins.
+* **Payload URL**: `http://<jenkins-url>:8080/github-webhook/`.
+* **Advantage**: Zero lag; instant build execution with zero polling overhead.
+
+#### 2. Poll SCM
+* **Mechanism**: Scheduled polling. Jenkins wakes up on a specified cron schedule, connects to the Git repository, and checks if the latest commit hash differs from the previous build.
+* **Behavior**: If new commits exist $	o$ **triggers build**. If no commits exist $	o$ **does nothing**.
+* **Use Case**: On-premise repositories behind strict corporate firewalls that cannot receive inbound webhooks from external Git providers.
+
+#### 3. Build Periodically
+* **Mechanism**: Unconditional time-based execution. Jenkins triggers a build strictly based on a cron schedule, **regardless of whether new commits were pushed or not**.
+* **Use Case**: Nightly integration builds, end-of-day security vulnerability scans, weekly performance regression test suites.
+
+#### 4. Build After Other Projects Are Built (Upstream / Downstream)
+* **Mechanism**: Pipeline chaining. Executes this job automatically when one or more designated upstream jobs finish.
+* **Trigger Conditions**: Can trigger only on `SUCCESS`, on `UNSTABLE`, or even on `FAILURE`.
+* **Use Case**: Triggering integration testing after a core microservice artifact has successfully built and packaged.
+
+#### 5. Trigger Builds Remotely (External API Token)
+* **Mechanism**: External HTTP invocation. Allows external third-party systems or bash scripts to trigger a build via a parameterized REST API call.
+* **URL Syntax**:
+  ```bash
+  curl -X POST "http://jenkins.example.com/job/app-deploy/build?token=SECRET_DEPLOY_TOKEN_2026"
+  ```
 
 ---
 
-## 3. Complete Production Declarative `Jenkinsfile`
+## 3. Jenkins Cron Scheduling & Weather Report Indicators
+
+### Cron Expression Syntax
+Jenkins uses standard 5-field cron notation with special hash extension:
+
+```text
+ ┌───────────── Minute (0 - 59)
+ │ ┌─────────── Hour (0 - 23)
+ │ │ ┌───────── Day of Month (1 - 31)
+ │ │ │ ┌─────── Month (1 - 12)
+ │ │ │ │ ┌───── Day of Week (0 - 7, where 0 and 7 are Sunday)
+ │ │ │ │ │
+ * * * * *
+```
+
+* **Common Examples**:
+  * `0 2 * * *` — Every day at 2:00 AM.
+  * `H/15 * * * *` — Every 15 minutes.
+  * `0 0 * * 1-5` — Midnight every weekday (Monday through Friday).
+* **The `H` (Hash) Symbol in Jenkins**:
+  * If 50 jobs are scheduled at `0 0 * * *`, they all launch at midnight simultaneously, crashing the CPU.
+  * Using `H 0 * * *` allows Jenkins to hash the job name and distribute start times between 00:00 and 00:59, flattening resource consumption.
+
+### Jenkins Health Weather Report Indicators
+Jenkins displays a weather icon next to each job representing **recent build health stability** (calculated over the last 5 builds):
+
+| Icon | Health State | Success Rate | Meaning |
+| :--- | :--- | :--- | :--- |
+| ☀️ **Sunny** | Excellent | **100% Success** | Last 5 out of 5 builds succeeded |
+| ⛅ **Cloud & Sun** | Good | **80% Success** | 4 out of 5 builds succeeded |
+| ☁️ **Cloudy** | Fair / Degraded | **50% Success** | Half of recent builds are failing |
+| 🌧️ **Rain** | Poor | **35% Success** | Most recent builds are failing |
+| ⛈️ **Thunder / Storm** | Critical Failure | **0% Success** | All recent builds failed repeatedly |
+
+---
+
+## 4. Production Crisis Resolution: The Jenkins `/tmp` Low Memory Issue
+
+A classic real-world incident experienced in enterprise build clusters running on Linux worker nodes.
+
+### The Problem & Root Cause
+* During heavy Maven Java compilation, Docker layer unpacking, or npm builds, extensive temporary files and extraction caches are written to `/tmp`.
+* On many Linux distributions, `/tmp` is mounted by default as a virtual **`tmpfs` in-memory filesystem** with a small default allocation (e.g., 512MB or 1GB).
+* When `/tmp` fills to 100%, builds crash catastrophically with errors:
+  * `java.io.IOException: No space left on device`
+  * `Fatal error: could not create JVM temporary directory`
+
+### Step-by-Step Production Emergency Resolution
+
+#### Step 1: Stop Services
+```bash
+# Gracefully stop Jenkins agent process
+sudo systemctl stop jenkins-agent.service
+```
+
+#### Step 2: Unmount Existing Exhausted `/tmp`
+```bash
+sudo umount /tmp
+```
+
+#### Step 3: Configure Permanent Sized `/tmp` in `/etc/fstab`
+```bash
+# Edit the filesystem table
+sudo nano /etc/fstab
+
+# Add or update the tmpfs entry with explicit 3GB or larger allocation
+tmpfs   /tmp    tmpfs   defaults,size=3G,mode=1777   0   0
+```
+
+#### Step 4: Remount & Validate
+```bash
+# Remount all filesystems defined in fstab
+sudo mount -a
+
+# Validate new 3GB capacity
+df -h /tmp
+```
+
+#### Step 5: Restart Jenkins Agent
+```bash
+sudo systemctl start jenkins-agent.service
+sudo systemctl status jenkins-agent.service
+```
+
+---
+
+## 5. Maven Lifecycle, Artifact Formats, & Nexus Publishing
+
+### Apache Maven Build Lifecycle
+Maven is a build automation and dependency management tool for Java projects governed by a `pom.xml` configuration file.
+
+```text
+validate ──► compile ──► test ──► package ──► verify ──► install ──► deploy
+```
+1. **`validate`**: Validates project structure and verifies all required `pom.xml` details are available.
+2. **`compile`**: Compiles source code (`.java` files) into bytecode (`.class` files) under `target/classes`.
+3. **`test`**: Runs unit tests (e.g., JUnit) without packaging.
+4. **`package`**: Packages compiled code into distributable binaries (`target/*.jar` or `target/*.war`).
+5. **`verify`**: Runs integration test checks against the packaged artifact.
+6. **`install`**: Installs package into local machine repository (`~/.m2/repository`).
+7. **`deploy`**: Copies final package to remote enterprise artifact repository (**Nexus OSS** or **JFrog Artifactory**).
+
+### Artifact Formats Comparison
+* **JAR (Java Archive)**: Contains compiled Java libraries, classes, and resources. Executable standalone via `java -jar app.jar` (e.g., Spring Boot).
+* **WAR (Web Application Archive)**: Contains web components (servlets, JSP, XML, HTML, JS) designed to deploy inside a Servlet container (Apache Tomcat, WildFly).
+* **EAR (Enterprise Archive)**: Bundles multiple JAR and WAR modules for Java EE enterprise servers.
+
+### Nexus OSS (Artifact Repository Management)
+* Centralized, version-controlled repository to store build artifacts, preventing rebuilds and enabling instant rollback to known binary versions.
+* Maven deployment configuration inside `pom.xml`:
+  ```xml
+  <distributionManagement>
+    <repository>
+      <id>nexus-releases</id>
+      <url>http://nexus.internal:8081/repository/maven-releases/</url>
+    </repository>
+  </distributionManagement>
+  ```
+
+---
+
+## 6. Jenkins Security: Role-Based Authorization Strategy
+
+By default, Jenkins grants all logged-in users administrative access. Production Jenkins enforces strict Role-Based Access Control via the **Role-based Authorization Strategy** plugin.
+
+### The 3 Core Role Types
+* **Global Roles**:
+  * Cross-system permissions: `Admin`, `Read-Only`, `Job-Creator`.
+  * Controls access to Jenkins system settings, plugin management, and credential viewing.
+* **Project Roles (Item Roles)**:
+  * Pattern-matched permissions using Regex (e.g., `payment-.*` or `mobile-.*`).
+  * Restricts developers to viewing, configuring, and building only their specific microservice jobs.
+* **Agent / Node Roles**:
+  * Controls which teams can configure or execute builds on specific worker nodes (e.g., restricting GPU build agents to AI engineers).
+
+---
+
+## 7. Declarative vs Scripted Pipelines
+
+```text
+┌───────────────────────────────┬─────────────────────────────────────────────┐
+│ Declarative Pipeline          │ Scripted Pipeline                           │
+├───────────────────────────────┼─────────────────────────────────────────────┤
+│ Modern standard (Blue Ocean)  │ Legacy traditional Groovy DSL               │
+│ Enclosed in pipeline { ... }  │ Enclosed in node { ... }                    │
+│ Strict, predictable syntax    │ Arbitrary procedural Groovy logic           │
+│ Pre-execution syntax checking │ Errors caught only during runtime execution │
+│ Restartable from failed stage │ Cannot easily restart stages                │
+└───────────────────────────────┴─────────────────────────────────────────────┘
+```
+
+---
+
+## 8. Complete Production Declarative `Jenkinsfile` Blueprint
 
 ```groovy
 pipeline {
     agent {
-        label 'docker-agent'
+        label 'linux-docker-agent'
     }
 
     options {
         timeout(time: 1, unit: 'HOURS')
         buildDiscarder(logRotator(numToKeepStr: '10'))
         disableConcurrentBuilds()
-        ansiColor('xterm')
     }
 
     environment {
-        DOCKER_REGISTRY  = 'devops-org'
-        APP_IMAGE_NAME   = 'taskflow-backend'
-        IMAGE_TAG        = "${BUILD_NUMBER}-${GIT_COMMIT[0..7]}"
-        SONAR_HOST_URL   = 'https://sonarqube.internal'
+        REGISTRY = 'registry.hub.docker.com'
+        IMAGE_NAME = 'akhil/taskflow-api'
+        IMAGE_TAG = "${env.BUILD_NUMBER}"
+        DOCKER_CREDS = credentials('dockerhub-credentials')
+        SONAR_CREDS = credentials('sonarqube-token')
     }
 
     stages {
-        stage('Checkout & Lint') {
+        stage('Checkout Source') {
             steps {
-                echo 'Checking out source code...'
                 checkout scm
-                sh 'npm run lint'
             }
         }
 
-        stage('Unit Tests & Coverage') {
-            steps {
-                echo 'Executing automated test suites...'
-                sh 'npm test -- --coverage'
-            }
-        }
-
-        stage('SonarQube Static Analysis') {
+        stage('Code Quality & SonarQube') {
             steps {
                 withSonarQubeEnv('SonarQube-Server') {
-                    sh 'sonar-scanner -Dsonar.projectKey=taskflow-api'
+                    sh 'mvn clean verify sonar:sonar'
+                }
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
                 }
             }
         }
 
-        stage('Build & Push Docker Image') {
+        stage('Build & Package Artifact') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', 
-                                                  usernameVariable: 'DOCKER_USER', 
-                                                  passwordVariable: 'DOCKER_PASS')]) {
-                    sh """echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin && docker build -t ${DOCKER_REGISTRY}/${APP_IMAGE_NAME}:${IMAGE_TAG} . && docker push ${DOCKER_REGISTRY}/${APP_IMAGE_NAME}:${IMAGE_TAG}"""
-                }
+                sh 'mvn clean package -DskipTests=true'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh """
+                    docker build -t ${IMAGE_NAME}:${IMAGE_TAG} -t ${IMAGE_NAME}:latest .
+                """
+            }
+        }
+
+        stage('Security Scan (Docker Scout)') {
+            steps {
+                sh "docker scout cves ${IMAGE_NAME}:${IMAGE_TAG} --exit-code --only-severity critical"
+            }
+        }
+
+        stage('Push Image to Registry') {
+            steps {
+                sh """
+                    echo ${DOCKER_CREDS_PSW} | docker login -u ${DOCKER_CREDS_USR} --password-stdin
+                    docker push ${IMAGE_NAME}:${IMAGE_TAG}
+                    docker push ${IMAGE_NAME}:latest
+                """
             }
         }
 
         stage('Deploy to Kubernetes') {
             steps {
-                withKubeConfig([credentialsId: 'k8s-cluster-credentials']) {
-                    sh """
-                        kubectl set image deployment/api-deployment                           api=${DOCKER_REGISTRY}/${APP_IMAGE_NAME}:${IMAGE_TAG}                           -n production
-                        kubectl rollout status deployment/api-deployment -n production --timeout=300s
-                    """
-                }
+                sh """
+                    kubectl set image deployment/taskflow-backend                         api-server=${IMAGE_NAME}:${IMAGE_TAG} -n production
+                    kubectl rollout status deployment/taskflow-backend -n production
+                """
             }
         }
     }
 
     post {
+        success {
+            slackSend channel: '#devops-deployments', color: 'good',
+                message: "Build SUCCESS: Job ${env.JOB_NAME} [${env.BUILD_NUMBER}] deployed successfully."
+        }
+        failure {
+            slackSend channel: '#devops-deployments', color: 'danger',
+                message: "Build FAILURE: Job ${env.JOB_NAME} [${env.BUILD_NUMBER}] failed."
+        }
         always {
             cleanWs()
         }
-        success {
-            echo "Pipeline succeeded! Deployed tag: ${IMAGE_TAG}"
-        }
-        failure {
-            echo "Pipeline failed on build: ${BUILD_NUMBER}. Triggering alerts."
-        }
     }
 }
 ```
 
 ---
 
-## 4. CI/CD Pipeline Stages & Webhook Triggers
+## 9. Continuous Delivery vs Continuous Deployment
 
-### 6 Standard Continuous Delivery Stages
-* **1. Checkout**: Clones Git branch and validates commit checksum.
-* **2. Lint & Static Analysis**: Runs Linters and SonarQube to detect code smells, vulnerabilities, and coverage gates.
-* **3. Unit & Integration Testing**: Executes test harness; fails pipeline if coverage drops below threshold.
-* **4. Artifact Packaging**: Compiles code and builds multi-stage Docker image with unique Git SHA tag.
-* **5. Image Security Scan**: Runs Trivy or Aqua Security scan on container filesystem.
-* **6. CD Deployment**: Deploys updated image tag to Kubernetes (via `kubectl` or ArgoCD GitOps).
-
-### Trigger Mechanisms
-* **GitHub Webhooks (Standard)**: Instant trigger via HTTP POST payload when developer pushes code or opens PR.
-* **Poll SCM**: Periodic polling (e.g., `H/5 * * * *`); legacy and inefficient compared to Webhooks.
-* **Cron Schedules**: Nightly automated builds (e.g., `H 0 * * *`).
-* **Upstream Triggers**: Fires downstream pipeline when an upstream service build completes successfully.
-
----
-
-## 5. Credentials Management & Secret Masking
-
-### Security Best Practices
-* **Never Plaintext in Code**: Never commit passwords, tokens, or private keys to `Jenkinsfile` or Git.
-* **Jenkins Credentials Store**: Stores secrets encrypted on disk using AES-256 keys managed by Jenkins master.
-* **Console Masking**: Jenkins automatically replaces credential values with `****` in console build logs.
-
-### Accessing Credentials in Pipelines
-```groovy
-// 1. Username and Password
-withCredentials([usernamePassword(credentialsId: 'my-cred-id', 
-                                  usernameVariable: 'USER', 
-                                  passwordVariable: 'PASS')]) {
-    sh 'echo "Logging in as $USER"'
-}
-
-// 2. Secret Text (API Token)
-withCredentials([string(credentialsId: 'slack-webhook-token', variable: 'SLACK_TOKEN')]) {
-    sh 'curl -X POST -H "Authorization: Bearer $SLACK_TOKEN" ...'
-}
-
-// 3. Secret File (Kubeconfig or SSH Key)
-withCredentials([file(credentialsId: 'prod-kubeconfig', variable: 'KUBECONFIG')]) {
-    sh 'kubectl get nodes'
-}
-```
-
----
-
-## 6. Jenkins Shared Libraries (Enterprise Code Reuse)
-
-### Purpose
-* Centralize standard pipeline logic (notifications, docker build-and-push, sonarqube gates) into a single Git repository shared across hundreds of microservices.
-
-### Library Directory Structure
 ```text
-jenkins-shared-library/
-├── vars/
-│   ├── buildAndPushDocker.groovy  # Custom pipeline step
-│   └── notifySlack.groovy         # Custom alert step
-└── src/
-    └── org/company/utils/         # Groovy helper classes
+Code ──► Build ──► Test ──► Staging ──► [ MANUAL APPROVAL GATE ] ──► Production  = Continuous Delivery
+Code ──► Build ──► Test ──► Staging ──────────────────────────────► Production  = Continuous Deployment
 ```
 
-### Invoking Shared Library in `Jenkinsfile`
-```groovy
-@Library('enterprise-shared-library@v2.0.0') _
-
-pipeline {
-    agent any
-    stages {
-        stage('Build & Push') {
-            steps {
-                buildAndPushDocker(imageName: 'user-service', registry: 'devops-org')
-            }
-        }
-    }
-    post {
-        always {
-            notifySlack()
-        }
-    }
-}
-```
+* **Continuous Delivery (CDel)**: Every commit automatically builds, tests, and stages. Releasing to actual production requires an explicit **manual human approval gate** (e.g., QA sign-off or Product Manager release).
+* **Continuous Deployment (CDep)**: Zero human intervention. Every commit that passes the automated automated test suite and quality gates is automatically deployed straight to live production users.
 
 ---
 
-## 7. Ansible Architecture & Agentless Engine
+## 10. Ansible Architecture & Agentless Operations
 
-### Core Architecture
-```text
-┌─────────────────────────────────────────────────────────────┐
-│                      Control Node                           │
-│        (Ansible Installed: Python + SSH Client)             │
-│                                                             │
-│   ┌──────────────────┐  ┌──────────────────┐  ┌──────────┐  │
-│   │    Inventory     │  │    Playbooks     │  │  Vault   │  │
-│   │ (hosts.ini/yaml) │  │  (YAML Tasks)    │  │ (Secrets)│  │
-│   └──────────────────┘  └──────────────────┘  └──────────┘  │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ SSH (Linux) / WinRM (Windows)
-                               │ (Zero client agent required!)
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                     Managed Target Nodes                    │
-│                                                             │
-│   ┌──────────────────────┐      ┌──────────────────────┐    │
-│   │   Web Server (EC2)   │      │    DB Server (EC2)   │    │
-│   │   • Python installed │      │   • Python installed │    │
-│   │   • SSH authorized   │      │   • SSH authorized   │    │
-│   └──────────────────────┘      └──────────────────────┘    │
-└─────────────────────────────────────────────────────────────┘
-```
+Ansible is an open-source IT automation engine for configuration management, application deployment, and infrastructure provisioning.
 
-### Key Architectural Pillars
-* **Agentless**: No background agent daemon (unlike Puppet or Chef); connects directly over standard SSH.
-* **Idempotence**: Running a playbook 10 times produces the exact same outcome as running it once; only mutates state if changes are required (`ok` vs `changed`).
-* **Declarative Tasks**: Uses human-readable YAML to define target state.
+### Why Ansible is "Agentless"
+* **No Agent Daemons**: Unlike Chef, Puppet, or SaltStack, Ansible does not require any background agent software installed on managed target nodes.
+* **Protocol**: Communicates over standard **SSH (port 22)** on Linux nodes and **WinRM** on Windows.
+* **Idempotency**: Running an Ansible playbook multiple times produces the exact same end state without applying redundant changes or corrupting configurations.
 
 ---
 
-## 8. Ansible Inventory Management (INI & YAML)
+## 11. Ansible Inventory Management & Ad-Hoc Commands
 
-### Inventory in INI Format (`inventory.ini`)
+### Inventory File (`hosts.ini`)
 ```ini
 [webservers]
-web1.internal ansible_host=10.0.1.10
-web2.internal ansible_host=10.0.1.11
+web1.production.internal ansible_host=10.0.1.50
+web2.production.internal ansible_host=10.0.1.51
 
 [databases]
-db1.internal ansible_host=10.0.2.20
+db1.production.internal  ansible_host=10.0.2.100
 
 [production:children]
 webservers
@@ -288,195 +397,86 @@ databases
 
 [all:vars]
 ansible_user=ubuntu
-ansible_ssh_private_key_file=~/.ssh/devops-key.pem
+ansible_ssh_private_key_file=~/.ssh/devops_key.pem
 ansible_python_interpreter=/usr/bin/python3
 ```
 
----
-
-## 9. Ad-Hoc Commands & Core Modules Reference
-
-### Ad-Hoc CLI Syntax
-```bash
-# Ping test connectivity to all inventory servers
-ansible all -i inventory.ini -m ping
-
-# Check memory utilization across webservers
-ansible webservers -i inventory.ini -m command -a "free -m"
-
-# Install nginx with root privileges
-ansible webservers -i inventory.ini -m apt -a "name=nginx state=latest update_cache=yes" --become
-
-# Restart service across all targets
-ansible webservers -i inventory.ini -m service -a "name=nginx state=restarted" --become
-```
-
-### Core Ansible Modules
-
-| Module | Purpose | Example Task Action |
-| :--- | :--- | :--- |
-| `ansible.builtin.apt` / `yum` | OS Package Management | `name: docker-ce state: present` |
-| `ansible.builtin.service` / `systemd` | Service lifecycle control | `name: nginx state: started enabled: yes` |
-| `ansible.builtin.copy` | Copies static file to target | `src: app.conf dest: /etc/app.conf` |
-| `ansible.builtin.template` | Renders dynamic Jinja2 template | `src: nginx.conf.j2 dest: /etc/nginx/nginx.conf` |
-| `ansible.builtin.user` | Manages Linux user accounts | `name: devops groups: sudo state: present` |
-| `ansible.builtin.git` | Clones or updates Git repo | `repo: 'https://github.com/repo' dest: /app` |
-| `community.docker.docker_container` | Manages Docker containers | `name: web image: nginx:alpine state: started` |
+### Essential Ad-Hoc Commands
+* `ansible all -m ping -i hosts.ini` — Test SSH connectivity across all inventory hosts.
+* `ansible webservers -m command -a "uptime" -i hosts.ini` — Run arbitrary shell command.
+* `ansible webservers -m apt -a "name=nginx state=latest update_cache=yes" -b -i hosts.ini` — Upgrade package.
 
 ---
 
-## 10. Playbooks, Handlers, Loops, & Conditionals
+## 12. Ansible Playbooks, Handlers, & Jinja2 Templating
 
-### Complete Full-Stack Web App Playbook (`deploy.yaml`)
+### Production Nginx Playbook Blueprint
 ```yaml
 ---
-- name: Deploy Production Web Tier
+- name: Configure Production Web Servers
   hosts: webservers
   become: true
-
   vars:
     http_port: 80
-    app_directory: /var/www/html
-    required_packages:
-      - nginx
-      - curl
-      - git
+    app_root: /var/www/taskflow
 
   tasks:
-    - name: Install required OS packages
-      ansible.builtin.apt:
-        name: "{{ item }}"
+    - name: Install Nginx Web Server
+      apt:
+        name: nginx
         state: present
         update_cache: yes
-      loop: "{{ required_packages }}"
 
-    - name: Render dynamic Nginx configuration from template
-      ansible.builtin.template:
+    - name: Deploy Dynamic Nginx Configuration from Template
+      template:
         src: templates/nginx.conf.j2
         dest: /etc/nginx/sites-available/default
+        mode: '0644'
       notify: Reload Nginx Service
 
-    - name: Ensure Nginx is running and enabled on boot
-      ansible.builtin.service:
+    - name: Ensure Nginx is Running and Enabled
+      systemd:
         name: nginx
         state: started
         enabled: yes
 
-    - name: Create application directory
-      ansible.builtin.file:
-        path: "{{ app_directory }}"
-        state: directory
-        owner: www-data
-        group: www-data
-        mode: '0755'
-
   handlers:
     - name: Reload Nginx Service
-      ansible.builtin.service:
+      systemd:
         name: nginx
         state: reloaded
 ```
 
-### Handlers Concept
-* **Lazy Notification**: Handlers trigger **only when a notifying task actually makes a change** (`changed=true`).
-* Handlers execute once at the very end of the play, preventing redundant service restarts.
-
 ---
 
-## 11. Jinja2 Templating & Dynamic Configurations
+## 13. Ansible Vault Secret Encryption
 
-### Template File (`templates/nginx.conf.j2`)
-```nginx
-server {
-    listen {{ http_port }};
-    server_name {{ server_domain | default('localhost') }};
+Ansible Vault protects sensitive tokens, database passwords, and private SSH keys from being exposed in Git repositories.
 
-    root {{ app_directory }};
-    index index.html;
-
-    location / {
-        try_files $uri $uri/ =404;
-    }
-
-    # Dynamic backend upstream proxy
-    location /api/ {
-        proxy_pass http://{{ backend_host }}:{{ backend_port }}/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-```
-
----
-
-## 12. Reusable Ansible Roles
-
-### Standard Role Directory Structure
-```text
-roles/
-└── nginx/
-    ├── tasks/
-    │   └── main.yaml       # Core sequence of tasks
-    ├── handlers/
-    │   └── main.yaml       # Notified restart/reload handlers
-    ├── templates/
-    │   └── nginx.conf.j2   # Jinja2 template files
-    ├── vars/
-    │   └── main.yaml       # High-priority role variables
-    ├── defaults/
-    │   └── main.yaml       # Overridable default variables
-    └── meta/
-        └── main.yaml       # Role dependencies and metadata
-```
-
-### Using Roles in a Playbook
-```yaml
----
-- name: Configure Production Web Cluster
-  hosts: webservers
-  become: true
-  roles:
-    - role: common_security
-    - role: docker
-    - role: nginx
-```
-
----
-
-## 13. Ansible Vault: Production Secret Encryption
-
-### Vault CLI Commands
-```bash
-# Encrypt an existing sensitive variables file
-ansible-vault encrypt vars/secrets.yaml
-
-# Edit an encrypted file in-place using default editor
-ansible-vault edit vars/secrets.yaml
-
-# View encrypted contents in terminal
-ansible-vault view vars/secrets.yaml
-
-# Run playbook with password prompt
-ansible-playbook -i inventory.ini deploy.yaml --ask-vault-pass
-
-# Run playbook in CI/CD using secure password file
-ansible-playbook -i inventory.ini deploy.yaml --vault-password-file ~/.vault_pass
-```
+* **Encrypt a Secrets File**:
+  ```bash
+  ansible-vault encrypt vars/secrets.yml
+  ```
+* **View / Edit Encrypted File**:
+  ```bash
+  ansible-vault edit vars/secrets.yml
+  ```
+* **Execute Playbook with Vault Password**:
+  ```bash
+  ansible-playbook -i hosts.ini site.yml --ask-vault-pass
+  ```
 
 ---
 
 ## 14. Senior DevOps Interview Q&A
 
-### Q1: What makes Ansible idempotent, and why does it matter?
-* An idempotent task evaluates the target system first; if the system is already in the desired state, it takes **no action** (`ok: 1, changed: 0`).
-* **Why it matters**: Allows engineers to safely execute playbooks repeatedly against production without restarting active services, creating duplicate users, or modifying intact configurations.
+### Q1: What is the difference between Poll SCM and GitHub Webhooks?
+* **GitHub Webhook**: Event-driven push from GitHub to Jenkins immediately when code is pushed. Zero delay, zero wasted CPU overhead.
+* **Poll SCM**: Scheduled cron job inside Jenkins that periodically connects to GitHub to check for changes. Can introduce latency (up to polling interval) and wastes CPU cycles if no changes exist.
 
-### Q2: What is the difference between Jenkins Multibranch Pipeline and standard Pipeline?
-* **Standard Pipeline**: Points to a single fixed Git branch (e.g., `main`).
-* **Multibranch Pipeline**: Automatically scans the entire Git repository, discovers any branch or Pull Request containing a `Jenkinsfile`, and automatically provisions dynamic build jobs per branch.
+### Q2: How did you diagnose and resolve Jenkins running out of space on worker nodes?
+* Root cause was the `/tmp` directory mounted on a small virtual `tmpfs` partition in memory, which was exhausted by Maven builds unpacking jar dependencies.
+* Resolved by stopping the Jenkins agent service, unmounting `/tmp`, adding `tmpfs /tmp tmpfs defaults,size=3G,mode=1777 0 0` in `/etc/fstab`, executing `mount -a`, and restarting the agent service.
 
-### Q3: How do you prevent sensitive secrets from leaking into Jenkins console output?
-* Store secrets strictly in the Jenkins Credentials Store.
-* Bind credentials via `withCredentials([usernamePassword(...)])` or `environment { SECRET = credentials('id') }`.
-* Jenkins replaces matching credential strings with `****` in console output.
-* **Caveat**: Avoid echoing commands with `set -x` in shell blocks or passing secrets via URL query parameters.
+### Q3: What is the significance of the `H` symbol in Jenkins cron triggers?
+* The `H` symbol distributes job executions using a hash of the project name across the time window. This prevents all scheduled jobs from launching at the exact same minute and overloading system CPU and RAM.

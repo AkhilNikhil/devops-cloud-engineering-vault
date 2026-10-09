@@ -1,37 +1,37 @@
 # 🐳 Docker Container Engineering: The Definitive Master Guide
 
 > **Authoritative Master Reference & Senior Technical Interview Playbook**  
-> Covers Container Architecture (Client-Daemon-Registry), Linux Namespaces & cgroups, Dockerfile Mastery, Multi-Stage Optimization, Compose Orchestration, Storage Volumes, Networking Topologies, Security Hardening, and Production Troubleshooting.
+> Covers Container Architecture, Linux Namespaces & cgroups, Dockerfile Mastery, Multi-Stage Optimization (Node.js & Python), Compose v2 Orchestration, Storage Volumes & Maintenance (`prune`), Networking Topologies, Modern Tooling (Docker Scout & Docker Init), Security Hardening, and Production Troubleshooting.
 
 ---
 
 ## 📑 Table of Contents
-- [1. Architecture & Core Concepts](#1-architecture--core-concepts)
+- [1. Container Architecture & Kernel Fundamentals](#1-container-architecture--kernel-fundamentals)
 - [2. Virtual Machines vs Docker Containers](#2-virtual-machines-vs-docker-containers)
-- [3. Docker Images vs Docker Containers](#3-docker-images-vs-docker-containers)
-- [4. Complete Dockerfile Instruction Guide](#4-complete-dockerfile-instruction-guide)
-- [5. RUN vs CMD vs ENTRYPOINT](#5-run-vs-cmd-vs-entrypoint)
-- [6. Docker Storage: Volumes, Bind Mounts, & tmpfs](#6-docker-storage-volumes-bind-mounts--tmpfs)
-- [7. Docker Networking Architecture](#7-docker-networking-architecture)
-- [8. Docker Compose v2 Multi-Tier Orchestration](#8-docker-compose-v2-multi-tier-orchestration)
-- [9. Multi-Stage Dockerfile Optimization](#9-multi-stage-dockerfile-optimization)
-- [10. Essential Docker CLI Reference](#10-essential-docker-cli-reference)
-- [11. Production Troubleshooting & Debugging](#11-production-troubleshooting--debugging)
-- [12. Docker vs containerd vs Kubernetes](#12-docker-vs-containerd-vs-kubernetes)
-- [13. Security Hardening & Best Practices](#13-security-hardening--best-practices)
+- [3. Complete Dockerfile Instruction Reference](#3-complete-dockerfile-instruction-reference)
+- [4. Execution Mechanics: RUN vs CMD vs ENTRYPOINT](#4-execution-mechanics-run-vs-cmd-vs-entrypoint)
+- [5. Storage Systems: Volumes, Bind Mounts, & tmpfs](#5-storage-systems-volumes-bind-mounts--tmpfs)
+- [6. Docker Maintenance & Cleanup (`system prune`)](#6-docker-maintenance--cleanup-system-prune)
+- [7. Networking Architecture & Topologies](#7-networking-architecture--topologies)
+- [8. Modern Tooling: Docker Scout & Docker Init](#8-modern-tooling-docker-scout--docker-init)
+- [9. Multi-Stage Optimization (Node.js & Python)](#9-multi-stage-optimization-nodejs--python)
+- [10. Docker Compose v2 Production Orchestration](#10-docker-compose-v2-production-orchestration)
+- [11. Essential Docker CLI Command Reference](#11-essential-docker-cli-command-reference)
+- [12. Production Troubleshooting Playbook](#12-production-troubleshooting-playbook)
+- [13. Security Hardening Checklist](#13-security-hardening-checklist)
 - [14. Senior DevOps Interview Q&A](#14-senior-devops-interview-qa)
 
 ---
 
-## 1. Architecture & Core Concepts
+## 1. Container Architecture & Kernel Fundamentals
 
-### System Architecture
+### System Architecture Overview
 ```text
 ┌─────────────────────────────────────────────────────────────┐
 │                       Docker Client                         │
-│   (CLI: docker build, docker run, docker push, docker ps)   │
+│   (CLI commands: docker build, docker run, docker scout)    │
 └──────────────────────────────┬──────────────────────────────┘
-                               │ REST API / UNIX Socket
+                               │ REST API / UNIX Socket (/var/run/docker.sock)
                                ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                       Docker Daemon                         │
@@ -40,480 +40,597 @@
 │  ┌──────────────────┐  ┌──────────────────┐  ┌───────────┐  │
 │  │ Image Management │  │ Container Engine │  │ Network & │  │
 │  │ (Build & Cache)  │  │   (containerd)   │  │  Storage  │  │
-│  └──────────────────┘  └──────────────────┘  └───────────┘  │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ Push / Pull Images
-                               ▼
+│  └──────────────────┘  └────────┬─────────┘  └───────────┘  │
+└─────────────────────────────────┼───────────────────────────┘
+                                  │ CRI / OCI Spec
+                                  ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                      Docker Registry                        │
-│     (Docker Hub, AWS ECR, Azure ACR, GitHub Packages)       │
+│                     containerd-shim                         │
+│   • Decouples container process from the daemon             │
+│   • Keeps container running during dockerd restarts         │
+└─────────────────────────────────┬───────────────────────────┘
+                                  │ Invokes
+                                  ▼
+┌─────────────────────────────────────────────────────────────┐
+│                          runc                               │
+│   • Low-level OCI reference runtime                         │
+│   • Talks directly to Linux Kernel to spawn containers      │
+└─────────────────────────────────┬───────────────────────────┘
+                                  │ Configures
+                                  ▼
+┌─────────────────────────────────────────────────────────────┐
+│                       Linux Kernel                          │
+│   • Namespaces (Isolation)      • cgroups (Resource Limits) │
+│   • Overlay2 (Storage)          • Netfilter / iptables      │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Core Architecture Components
-* **Docker Client**:
-  * Command-line interface used by engineers and CI/CD pipelines.
-  * Communicates with the daemon via REST API over `/var/run/docker.sock` or TCP.
-* **Docker Daemon (`dockerd`)**:
-  * Background system service managing container lifecycles.
-  * Handles image building, container execution, storage drivers, and virtual networks.
-* **Docker Registry**:
-  * Centralized catalog storing and distributing versioned container images.
-  * Public (Docker Hub) or enterprise-private (AWS ECR, Azure ACR, Harbor).
-* **Underlying Linux Kernel Technologies**:
-  * **Namespaces**: Provide process isolation (`PID`), networking (`NET`), mounts (`MNT`), and user access (`USER`).
-  * **Control Groups (`cgroups`)**: Enforce hard limits on CPU, memory, disk I/O, and network bandwidth.
-  * **OverlayFS**: Union filesystem stacking read-only layers with a single read-write container layer.
+### The Two Linux Kernel Pillars
+Containers are **not virtual machines**; they are standard Linux processes running in isolated environments powered by two specific kernel features:
+
+#### 1. Linux Namespaces (What a Container Can See)
+* **PID Namespace (Process ID)**:
+  * Isolates the process ID tree.
+  * The main container process becomes PID 1 inside the container, but appears as a normal unprivileged PID (e.g., PID 84920) on the host kernel.
+* **NET Namespace (Networking)**:
+  * Gives the container its own virtual network interfaces (e.g., `eth0`), loopback interface, IP address, and private routing/iptables rules.
+* **MNT Namespace (Mount / Filesystem)**:
+  * Provides an isolated filesystem view rooted at `/`.
+  * The container cannot see or access host paths unless explicitly mounted.
+* **IPC Namespace (Inter-Process Communication)**:
+  * Isolates shared memory segments, semaphores, and POSIX message queues from other containers and the host.
+* **UTS Namespace (Hostname & Domain)**:
+  * Allows the container to have its own unique hostname (e.g., container ID or custom name).
+* **USER Namespace (User & Group IDs)**:
+  * Maps UID 0 (root) inside the container to a non-privileged UID on the host, preventing host root takeovers.
+
+#### 2. Control Groups (cgroups) (What a Container Can Use)
+* **CPU Limiting**: Controls maximum CPU share and execution bandwidth (e.g., `--cpus="1.5"` or `--cpu-shares=1024`).
+* **Memory Limiting**: Sets hard memory caps (e.g., `--memory="512m"`). If exceeded, the Linux Kernel OOM killer terminates the process (Exit Code 137).
+* **Block I/O (blkio)**: Throttles read/write disk I/O rates to prevent noisy-neighbor storage saturation.
+* **PIDs Limiting**: Limits the maximum number of child processes (`--pids-limit=100`) to completely eliminate fork bomb attacks.
 
 ---
 
 ## 2. Virtual Machines vs Docker Containers
 
-### Technical Comparison Matrix
+### Point-by-Point Comparison
 
 | Feature | Virtual Machine (VM) | Docker Container |
 | :--- | :--- | :--- |
-| **Operating System** | Full Guest OS with dedicated kernel | Shares host Linux OS kernel |
-| **Hardware Isolation** | Hypervisor level (Type 1 / Type 2) | Kernel level (Namespaces + cgroups) |
-| **Startup Time** | Minutes (boots entire OS stack) | Milliseconds to seconds (starts user process) |
-| **Disk Footprint** | Gigabytes (GBs) per instance | Megabytes (MBs) (minimal runtime layers) |
-| **Memory Overhead** | High (memory allocated to guest OS) | Minimal (only memory used by process) |
-| **Portability** | Low (heavy image formats: OVA, VHD) | Extremely High (OCI standard image spec) |
-| **Performance** | Native virtualization overhead | Near-bare-metal performance |
-
-### Key Takeaway for DevOps
-* **Elimination of Environment Drift**: Solves the classic *"works on my machine"* dilemma by shipping application code with its exact dependencies, configurations, and runtime binaries.
+| **Architecture** | Runs a complete Guest OS on top of a Hypervisor | Runs as an isolated process on the shared Host OS Kernel |
+| **Hypervisor** | Requires Type 1 (ESXi, KVM) or Type 2 (VirtualBox) | Requires only container runtime (`containerd`, `runc`) |
+| **Boot Time** | Minutes (boots BIOS, kernel, system services) | Milliseconds to seconds (spawns single process) |
+| **Resource Footprint** | Heavy (Gigabytes of RAM & storage for Guest OS) | Extremely light (Megabytes, shares host kernel memory) |
+| **Storage Overhead** | Large virtual disk images (`.vmdk`, `.qcow2`) | Layered Overlay2 union filesystem sharing base layers |
+| **Isolation Level** | Strong hardware-level isolation via hypervisor | Process-level isolation via kernel namespaces and cgroups |
+| **Portability** | Heavy to export and move across environments | Ultra-portable OCI images run identically anywhere |
+| **Density** | Low (tens of VMs per physical host) | High (hundreds of containers per physical host) |
 
 ---
 
-## 3. Docker Images vs Docker Containers
+## 3. Complete Dockerfile Instruction Reference
 
-### Conceptual Difference
-* **Docker Image**:
-  * Immutable, read-only template and blueprint.
-  * Composed of ordered stacked filesystem layers built from a `Dockerfile`.
-  * Stored in a registry and identified by repository and tag (e.g., `node:18-alpine`).
-* **Docker Container**:
-  * A running, stateful instance of an image.
-  * Adds a thin **read-write layer** (container layer) on top of immutable image layers.
-  * Multiple isolated containers can run concurrently from a single underlying image.
+A Dockerfile is a step-by-step blueprint for building an OCI container image. Every line creates an immutable layer cached by the build engine.
 
-### Visualizing Image Layers & Container Layer
+### Detailed Point-by-Point Instruction Guide
+
+#### 1. `FROM`
+* **Purpose**: Defines the parent base image. Must be the very first non-comment instruction (except `ARG`).
+* **Best Practice**: Always pin to a specific, minimal version (e.g., `FROM node:18.19-alpine` instead of `FROM node:latest`).
+* **Multi-Stage Syntax**: `FROM <image> AS <stage_name>` enables naming stages for intermediate builds.
+
+#### 2. `WORKDIR`
+* **Purpose**: Sets the working directory for all subsequent `RUN`, `CMD`, `ENTRYPOINT`, `COPY`, and `ADD` instructions.
+* **Best Practice**: Always use absolute paths (e.g., `WORKDIR /app`). Automatically creates directories if they do not exist.
+* **Anti-Pattern**: Avoid chaining `RUN cd /app && npm start`—directory changes do not persist across separate `RUN` layers!
+
+#### 3. `COPY` vs `ADD`
+* **`COPY` (Preferred)**:
+  * Copies local files/directories from the build context into the container filesystem.
+  * Predictable, transparent, and supports ownership flags: `COPY --chown=node:node . .`.
+* **`ADD` (Specialized)**:
+  * Can unpack compressed archives automatically (e.g., `ADD rootfs.tar.gz /`).
+  * Can fetch files from remote URLs (not recommended due to cache invalidation).
+  * **Rule**: Use `COPY` for all standard files; use `ADD` only when auto-extracting local tarballs.
+
+#### 4. `RUN`
+* **Purpose**: Executes shell commands during the image build phase to install packages and compile code.
+* **Layer Caching Rule**: Chain dependent commands using `&&` to minimize intermediate image layers:
+  ```dockerfile
+  RUN apt-get update && apt-get install -y --no-install-recommends       curl       ca-certificates       && rm -rf /var/lib/apt/lists/*
+  ```
+
+#### 5. `ENV` vs `ARG`
+* **`ARG` (Build-Time Only)**:
+  * Available only while `docker build` is executing (e.g., `--build-arg VERSION=1.2.0`).
+  * Never baked into the running container environment.
+* **`ENV` (Runtime Available)**:
+  * Sets environment variables available during build **and** inside the running container.
+  * Example: `ENV NODE_ENV=production PORT=3000`.
+
+#### 6. `EXPOSE`
+* **Purpose**: Documents the port on which the container application listens.
+* **Important Note**: `EXPOSE` **does not** actually publish or open ports to the host! It serves purely as documentation. You must still pass `-p host_port:container_port` at runtime.
+
+#### 7. `VOLUME`
+* **Purpose**: Creates an anonymous mount point and marks it as holding externally mounted storage.
+* **Behavior**: Any data written to a `VOLUME` path bypasses the container writable layer and is stored directly on host storage.
+
+#### 8. `USER`
+* **Purpose**: Switches the active UID/GID for all subsequent instructions and container runtime.
+* **Security Critical**: **Never run containers as root in production!** Always create and switch to an unprivileged user (e.g., `USER 10001` or `USER node`).
+
+#### 9. `HEALTHCHECK`
+* **Purpose**: Instructs Docker how to test if the container application is actually healthy and responding.
+* **Syntax**:
+  ```dockerfile
+  HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3     CMD curl -f http://localhost:3000/health || exit 1
+  ```
+
+---
+
+## 4. Execution Mechanics: RUN vs CMD vs ENTRYPOINT
+
+Understanding the exact difference between these three instructions is a top-tier interview drill.
+
 ```text
-┌─────────────────────────────────────────────────────────────┐
-│ [READ-WRITE LAYER] Container Layer (Logs, temp files, state) │
-├─────────────────────────────────────────────────────────────┤
-│ [READ-ONLY LAYER]  CMD ["node", "server.js"]                │
-├─────────────────────────────────────────────────────────────┤
-│ [READ-ONLY LAYER]  COPY . /app                              │
-├─────────────────────────────────────────────────────────────┤
-│ [READ-ONLY LAYER]  RUN npm install --production             │
-├─────────────────────────────────────────────────────────────┤
-│ [READ-ONLY LAYER]  COPY package*.json ./                    │
-├─────────────────────────────────────────────────────────────┤
-│ [READ-ONLY LAYER]  FROM node:18-alpine                      │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────┬────────────────────────────────────────────────────────┐
+│ Instruction     │ When Does It Execute? / What Does It Do?               │
+├─────────────────┼────────────────────────────────────────────────────────┤
+│ RUN             │ Executes during BUILD phase; commits a new layer       │
+│ ENTRYPOINT      │ Configures the fixed executable at RUNTIME             │
+│ CMD             │ Provides default arguments to ENTRYPOINT or default app│
+└─────────────────┴────────────────────────────────────────────────────────┘
 ```
 
----
+### The Two Syntax Forms
+1. **Exec Form (Preferred & Production Standard)**:
+   * Syntax: `["executable", "param1", "param2"]`
+   * Runs directly as PID 1 without invoking a shell.
+   * **Receives OS signals (`SIGTERM`, `SIGINT`) properly**, enabling clean container shutdown.
+2. **Shell Form (Discouraged)**:
+   * Syntax: `executable param1 param2`
+   * Docker wraps this command as `/bin/sh -c "executable param1 param2"`.
+   * The shell runs as PID 1; your application runs as a child process and **does not receive `SIGTERM`**, causing Docker to forcibly kill it after a 10s timeout (`SIGKILL`).
 
-## 4. Complete Dockerfile Instruction Guide
+### How `ENTRYPOINT` and `CMD` Work Together
 
-| Instruction | Purpose | Best Practice & Performance Rule |
-| :--- | :--- | :--- |
-| `FROM` | Sets base parent image | Always pin specific version tags (e.g., `python:3.11-slim`), avoid `:latest` |
-| `WORKDIR` | Sets active execution directory | Automatically creates directory; avoid chained `cd` commands |
-| `COPY` | Copies files from host to image | Preferred over `ADD` for all plain file operations |
-| `ADD` | Copies files, extracts tarballs, fetches URLs | Use **only** when automatic `.tar.gz` extraction is required |
-| `RUN` | Executes commands during image build | Chain related commands with `&&` and clear package caches in the same layer |
-| `ENV` | Sets persistent environment variables | Available during build and at container runtime |
-| `ARG` | Defines build-time arguments | Exists only during build; never pass production passwords via `ARG` |
-| `EXPOSE` | Documents intended container listening port | Serves as documentation; does **not** publish port to host |
-| `VOLUME` | Declares managed mount point | Use to mark persistent storage directories |
-| `USER` | Sets execution UID/GID | Switch to a non-root user before running application process |
-| `CMD` | Sets default container startup command | Easily overridden by CLI arguments; use exec form `["app", "arg"]` |
-| `ENTRYPOINT` | Configures container executable | Sets fixed executable; combines with `CMD` for default flags |
-| `HEALTHCHECK`| Configures health probe | Instructs Docker runtime how to test if service is actually healthy |
-
-### Production Node.js Dockerfile Example
 ```dockerfile
-# 1. Base image pinned to minimal Alpine Linux
-FROM node:18-alpine
-
-# 2. Define working directory
-WORKDIR /app
-
-# 3. Copy dependency manifests first to leverage layer caching
-COPY package*.json ./
-
-# 4. Install production dependencies only and clear cache
-RUN npm ci --only=production && npm cache clean --force
-
-# 5. Copy application source code
-COPY . .
-
-# 6. Document application port
-EXPOSE 3000
-
-# 7. Switch to non-root user bundled with node Alpine image
-USER node
-
-# 8. Define default startup command in exec form
-CMD ["node", "server.js"]
+ENTRYPOINT ["node", "server.js"]
+CMD ["--port", "3000"]
 ```
+* **Default execution**: `node server.js --port 3000`
+* **Overriding arguments (`docker run myimage --port 8080`)**: `node server.js --port 8080` (replaces `CMD`, keeps `ENTRYPOINT`).
+* **Overriding executable (`docker run --entrypoint /bin/sh myimage`)**: Completely overrides `ENTRYPOINT`.
 
 ---
 
-## 5. RUN vs CMD vs ENTRYPOINT
+## 5. Storage Systems: Volumes, Bind Mounts, & tmpfs
 
-### Technical Comparison Matrix
+Docker uses a layered storage driver (**Overlay2**) for container images. Any changes made inside a running container are written to a thin, temporary **Container Read-Write Layer**. When the container is deleted, that layer is destroyed.
 
-| Directive | Execution Phase | Overridable via CLI? | Primary Role |
-| :--- | :--- | :--- | :--- |
-| **`RUN`** | Image Build Time | N/A (creates immutable layer) | Installing OS packages, compiling binaries |
-| **`CMD`** | Container Startup | Yes (overridden by trailing CLI args) | Providing default arguments or commands |
-| **`ENTRYPOINT`** | Container Startup | No (requires explicit `--entrypoint` flag) | Defining the fixed container executable |
+To persist data, Docker provides three external storage mechanisms:
 
-### The Power Pattern: Combining ENTRYPOINT and CMD
-```dockerfile
-ENTRYPOINT ["python3", "manage.py"]
-CMD ["runserver", "0.0.0.0:8000"]
+```text
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              HOST MACHINE                               │
+│                                                                         │
+│  ┌───────────────────────────┐         ┌─────────────────────────────┐  │
+│  │    Named Docker Volume    │         │      Host Bind Mount        │  │
+│  │ (/var/lib/docker/volumes) │         │    (/home/user/project)     │  │
+│  └─────────────┬─────────────┘         └──────────────┬──────────────┘  │
+│                │                                      │                 │
+│                ▼                                      ▼                 │
+│  ┌───────────────────────────────────────────────────────────────────┐  │
+│  │                        DOCKER CONTAINER                           │  │
+│  │                                                                   │  │
+│  │  ┌─────────────────────────────────────────────────────────────┐  │  │
+│  │  │                 tmpfs Mount (Host RAM Only)                 │  │  │
+│  │  └─────────────────────────────────────────────────────────────┘  │  │
+│  └───────────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-* **Default Run**:
-  * `docker run myapp`
-  * Executes: `python3 manage.py runserver 0.0.0.0:8000`
-* **Overriding Arguments**:
-  * `docker run myapp migrate`
-  * Executes: `python3 manage.py migrate` (`CMD` is overridden, `ENTRYPOINT` remains fixed).
+### 1. Named Volumes (Best for Production & Databases)
+* **Location**: Fully managed by Docker inside `/var/lib/docker/volumes/<volume_name>/_data`.
+* **Key Advantages**:
+  * Completely independent of host directory structure and OS file permissions.
+  * Can be backed up, migrated, and managed via Docker CLI (`docker volume ls`, `docker volume inspect`).
+  * Supports volume drivers for cloud storage (AWS EBS, NFS, Ceph).
+* **CLI Syntax**:
+  ```bash
+  # Create named volume
+  docker volume create mysql_data
+
+  # Mount volume to container
+  docker run -d -v mysql_data:/var/lib/mysql mysql:8.0
+  ```
+
+### 2. Bind Mounts (Best for Local Development)
+* **Location**: Maps any arbitrary folder on the host machine directly into the container.
+* **Key Advantages**:
+  * Great for hot-reloading code during active local development.
+* **Risks**:
+  * Binds container security directly to host file permissions.
+  * Breaks portability if the specified host path does not exist on another machine.
+* **CLI Syntax**:
+  ```bash
+  docker run -d -v /home/user/code:/app node:18-alpine
+  ```
+
+### 3. tmpfs Mounts (In-Memory Ephemeral Storage)
+* **Location**: Stored strictly in the host machine's RAM; never written to disk.
+* **Key Advantages**:
+  * Ultra-fast read/write operations.
+  * High security for sensitive tokens, passwords, and encryption keys that must never touch permanent storage.
+* **CLI Syntax**:
+  ```bash
+  docker run -d --tmpfs /app/secrets myapp:latest
+  ```
 
 ---
 
-## 6. Docker Storage: Volumes, Bind Mounts, & tmpfs
+## 6. Docker Maintenance & Cleanup (`system prune`)
 
-### Comparison Matrix
+Over time, unused images, dead containers, dangling build caches, and orphan volumes silently consume hundreds of gigabytes of disk space.
 
-| Storage Type | Managed By | Host Location | Production Use Case |
-| :--- | :--- | :--- | :--- |
-| **Named Volume** | Docker Engine | `/var/lib/docker/volumes/<name>/_data` | Production databases, persistent application state |
-| **Bind Mount** | Host OS Filesystem | Arbitrary host path (e.g., `/home/dev/app`) | Local development live-reloading, host configs |
-| **tmpfs Mount** | Host System Memory | RAM only (never written to disk) | Sensitive tokens, ephemeral caches, high-speed temp data |
+### The `docker system prune` Command Suite
 
-### Volume Management CLI
-```bash
-# Create a dedicated named volume
-docker volume create postgres_data
+* **Standard Prune**:
+  ```bash
+  docker system prune
+  ```
+  * Removes stopped containers.
+  * Removes all unused networks.
+  * Removes dangling images (untagged `<none>` layers).
+  * Removes dangling build cache.
+  * **Does NOT delete named volumes** by default (safe from data loss).
 
-# List all local volumes
-docker volume ls
+* **Aggressive Production Cleanup**:
+  ```bash
+  docker system prune -a --volumes
+  ```
+  * `-a` (`--all`): Removes **all** unused images, not just dangling ones.
+  * `--volumes`: Prunes **all unused anonymous and named volumes** (Warning: deletes database data if containers are stopped!).
 
-# Inspect volume metadata and mount point
-docker volume inspect postgres_data
+* **Selective Pruning by Age (Safe Periodic Cron Job)**:
+  ```bash
+  # Prune containers stopped more than 24 hours ago
+  docker container prune --filter "until=24h"
 
-# Attach named volume to container
-docker run -d   --name db   -v postgres_data:/var/lib/postgresql/data   -e POSTGRES_PASSWORD=secret   postgres:14-alpine
-
-# Attach host bind mount (ideal for local development)
-docker run -d   --name web   -p 8080:80   -v $(pwd)/src:/usr/share/nginx/html:ro   nginx:alpine
-
-# Remove unused orphaned volumes
-docker volume prune -f
-```
+  # Prune images created more than 7 days ago
+  docker image prune -a --filter "until=168h"
+  ```
 
 ---
 
-## 7. Docker Networking Architecture
+## 7. Networking Architecture & Topologies
+
+Docker creates virtual network interfaces on the host and manages packet routing using Linux bridges and `iptables`.
 
 ### The 5 Core Network Drivers
-* **1. Bridge Network (Default)**:
-  * Creates a private internal virtual bridge (`docker0`).
-  * Containers receive private internal IPs (e.g., `172.17.0.x`).
-  * User-defined bridges enable automatic DNS service discovery by container name.
-* **2. Host Network**:
-  * Removes network isolation between container and host machine.
-  * Container binds directly to host network interfaces (no port forwarding `-p` needed).
-  * Delivers maximum throughput with zero NAT overhead.
-* **3. None Network**:
-  * Disables all external networking; container only possesses loopback interface (`lo`).
-  * Used for isolated batch computing, air-gapped security, and cryptographic hashing.
-* **4. Overlay Network**:
-  * Connects containers running across multiple distinct Docker hosts in a Swarm cluster.
-* **5. Macvlan Network**:
-  * Assigns a dedicated physical MAC address to container, making it appear as a physical device on the LAN.
 
-### Networking CLI & Service Discovery
-```bash
-# Create a custom bridge network
-docker network create app_net
+| Driver | Scope | How It Works | Primary Use Case |
+| :--- | :--- | :--- | :--- |
+| **`bridge`** | Single Host | Default private virtual bridge (`docker0`). Containers get private IPs (e.g. `172.17.0.x`). | Standard standalone containers & local compose |
+| **`host`** | Single Host | Bypasses container network isolation; container shares host network stack directly. | Ultra-low latency, high-throughput apps |
+| **`none`** | Container | Disables all networking; only loopback (`127.0.0.1`) interface exists. | High-security air-gapped jobs, batch crypto jobs |
+| **`overlay`**| Multi-Host | Enables cross-host container networking across Swarm or Kubernetes clusters. | Distributed multi-host clusters |
+| **`macvlan`**| Physical LAN| Assigns a real MAC address to the container, making it appear as a physical device on LAN. | Legacy apps needing direct physical subnet IPs |
 
-# Run two containers attached to the same network
-docker run -d --name database --network app_net -e POSTGRES_PASSWORD=secret postgres:alpine
-docker run -d --name backend --network app_net -p 3000:3000 my-backend-image
+### User-Defined Bridge Networks vs Default Bridge
+* **Default Bridge (`docker0`)**:
+  * Containers can only communicate with each other using raw IP addresses.
+  * **No automatic DNS resolution**!
+* **User-Defined Bridge Network (Production Standard)**:
+  * Has built-in embedded DNS server (`127.0.0.11`).
+  * Containers resolve each other **by container name or service name**!
+  * **Commands**:
+    ```bash
+    # Create isolated user bridge
+    docker network create -d bridge app-network
 
-# Service Discovery in Action:
-# The backend container can directly reach postgres using DNS:
-# "postgres://database:5432/mydb"
+    # Connect containers to network
+    docker run -d --name db --network app-network mysql:8.0
+    docker run -d --name web --network app-network -e DB_HOST=db mywebapp:latest
+    ```
+
+---
+
+## 8. Modern Tooling: Docker Scout & Docker Init
+
+Modern enterprise DevOps requires continuous security scanning and automated container scaffolding.
+
+### 1. Docker Scout (Vulnerability & CVE Analysis)
+Docker Scout scans container image layers, discovers software dependencies (SBOM - Software Bill of Materials), and identifies known vulnerabilities (CVEs) without requiring third-party tools.
+
+* **Quick Layer Summary**:
+  ```bash
+  docker scout quickview <image_name>:<tag>
+  ```
+  * Displays high-level vulnerability breakdown: Critical, High, Medium, Low.
+* **Full CVE Vulnerability Log**:
+  ```bash
+  docker scout cves <image_name>:<tag>
+  ```
+  * Lists exact CVE IDs, affected software packages, CVSS severity scores, and recommended fixed package versions.
+* **Base Image Recommendations**:
+  ```bash
+  docker scout recommendations <image_name>:<tag>
+  ```
+  * Suggests safer alternative base images that eliminate known vulnerabilities.
+
+### 2. Docker Init (Automated Project Scaffolding)
+`docker init` is a modern CLI utility that automatically analyzes your source code repository and writes optimized Docker configuration files.
+
+* **Workflow**:
+  1. Open your terminal inside your project directory.
+  2. Run:
+     ```bash
+     docker init
+     ```
+  3. Select your application programming language (Go, Python, Node, Java, Rust, etc.).
+  4. Specify package manager, port, and main entrypoint file.
+* **Generated Assets**:
+  * `.dockerignore` (pre-configured to exclude git, tests, and local caches).
+  * `Dockerfile` (optimized multi-stage build following security best practices).
+  * `compose.yaml` (starter Compose specification configured with unprivileged ports).
+
+---
+
+## 9. Multi-Stage Optimization (Node.js & Python)
+
+Multi-stage builds allow you to use heavy SDKs, compilers, and development tools during the build phase, and then copy **only the compiled artifacts and production dependencies** into a minimal, stripped-down runtime image.
+
+### Production Pattern 1: Node.js Multi-Stage Build
+```dockerfile
+# ==========================================
+# STAGE 1: Builder (Compiles TypeScript & Installs Dependencies)
+# ==========================================
+FROM node:18-alpine AS builder
+WORKDIR /app
+
+# Optimize layer caching: Only reinstall modules if package manifests change
+COPY package*.json ./
+RUN npm ci
+
+# Copy application source and build production bundle
+COPY . .
+RUN npm run build
+
+# Prune development dependencies to keep production footprint minimal
+RUN npm prune --production
+
+# ==========================================
+# STAGE 2: Production Runner (Lean, Clean, & Hardened)
+# ==========================================
+FROM node:18-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+
+# Security: Create and switch to non-root user
+USER node
+
+# Copy only production dependencies and compiled dist from builder
+COPY --from=builder --chown=node:node /app/node_modules ./node_modules
+COPY --from=builder --chown=node:node /app/dist ./dist
+COPY --from=builder --chown=node:node /app/package.json ./package.json
+
+EXPOSE 3000
+CMD ["node", "dist/index.js"]
+```
+
+### Production Pattern 2: Python Multi-Stage Build
+```dockerfile
+# ==========================================
+# STAGE 1: Builder (Compiles Wheels & C-Extensions)
+# ==========================================
+FROM python:3.11-slim AS builder
+WORKDIR /build
+
+RUN apt-get update && apt-get install -y --no-install-recommends     build-essential     gcc     && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir --user -r requirements.txt
+
+# ==========================================
+# STAGE 2: Production Runner (Minimal Slim Runtime)
+# ==========================================
+FROM python:3.11-slim AS runner
+WORKDIR /app
+
+# Create non-root system user
+RUN useradd -u 10001 -m -s /bin/bash appuser
+
+# Copy installed python packages from builder stage
+COPY --from=builder /root/.local /home/appuser/.local
+COPY --chown=appuser:appuser . .
+
+ENV PATH=/home/appuser/.local/bin:$PATH
+ENV PYTHONUNBUFFERED=1
+
+USER appuser
+
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
 ---
 
-## 8. Docker Compose v2 Multi-Tier Orchestration
+## 10. Docker Compose v2 Production Orchestration
 
-### Modern Production Specification (`compose.yaml`)
+Docker Compose v2 (`compose.yaml`) manages multi-container application stacks declaratively.
+
+### Production `compose.yaml` Blueprint
 ```yaml
-services:
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - "80:80"
-    depends_on:
-      backend:
-        condition: service_healthy
-    networks:
-      - frontend_net
+version: '3.8'
 
+services:
+  # Database Service
+  database:
+    image: mysql:8.0
+    container_name: taskflow_mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: taskflow_db
+      MYSQL_USER: taskflow_user
+      MYSQL_PASSWORD: ${DB_USER_PASSWORD}
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - internal_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Backend API Service
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    container_name: taskflow_backend
+    restart: always
+    environment:
+      DB_HOST: database
+      DB_PORT: 3306
+      DB_NAME: taskflow_db
+      DB_USER: taskflow_user
+      DB_PASSWORD: ${DB_USER_PASSWORD}
     ports:
-      - "3000:3000"
-    environment:
-      - DB_HOST=db
-      - DB_PORT=5432
-      - DB_USER=postgres
-      - DB_PASSWORD_FILE=/run/secrets/db_password
+      - "5000:5000"
     depends_on:
-      db:
+      database:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
     networks:
-      - frontend_net
-      - backend_net
+      - internal_network
+      - edge_network
 
-  db:
-    image: postgres:15-alpine
-    environment:
-      - POSTGRES_DB=taskflow
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=secret
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+  # Frontend Web Service
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: taskflow_frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
     networks:
-      - backend_net
+      - edge_network
 
+# Persistent Named Volumes
 volumes:
-  pgdata:
+  db_data:
+    driver: local
 
+# Isolated Network Topologies
 networks:
-  frontend_net:
-  backend_net:
-```
-
-### Essential Compose Commands
-```bash
-# Start all services in the background and rebuild changed images
-docker compose up -d --build
-
-# Inspect status of running services
-docker compose ps
-
-# Follow logs across all services with timestamps
-docker compose logs -f --tail=100
-
-# Scale a stateless service dynamically
-docker compose up -d --scale backend=3
-
-# Stop and remove containers, networks, and ephemeral resources
-docker compose down
-
-# Stop and remove containers including persistent volumes
-docker compose down -v
+  internal_network:
+    driver: bridge
+    internal: true  # Completely blocks direct internet inbound/outbound access
+  edge_network:
+    driver: bridge
 ```
 
 ---
 
-## 9. Multi-Stage Dockerfile Optimization
+## 11. Essential Docker CLI Command Reference
 
-### Why Use Multi-Stage Builds?
-* **Problem**: Build tools (Compilers, SDKs, npm devDependencies, Maven) bloat production images to 1GB+.
-* **Solution**: Use a heavy build stage to compile code, then copy **only the final compiled artifact** into a minimal runtime base (e.g., Alpine or Distroless).
+### Image Management
+* `docker build -t app:v1 .` — Build image from current directory Dockerfile.
+* `docker images` — List all local images.
+* `docker rmi <image_id>` — Remove local image.
+* `docker tag app:v1 username/app:v1` — Tag image for Docker Hub registry.
+* `docker push username/app:v1` — Push image to remote registry.
 
-### Full React + Nginx Production Multi-Stage Example
-```dockerfile
-# ==========================================
-# STAGE 1: Build Environment
-# ==========================================
-FROM node:18-alpine AS builder
-
-WORKDIR /app
-
-# Cache dependency layer
-COPY package*.json ./
-RUN npm ci
-
-# Copy source and compile production bundle
-COPY . .
-RUN npm run build
-
-# ==========================================
-# STAGE 2: Minimal Production Runtime
-# ==========================================
-FROM nginx:alpine
-
-# Remove default nginx static assets
-RUN rm -rf /usr/share/nginx/html/*
-
-# Copy compiled assets from Stage 1 builder
-COPY --from=builder /app/dist /usr/share/nginx/html
-
-# Copy custom Nginx configuration for SPA routing
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-EXPOSE 80
-
-# Run nginx in foreground
-CMD ["nginx", "-g", "daemon off;"]
-```
-
-* **Outcome**: Image size drops from ~950MB down to **~25MB** with zero build tools or source code exposed!
-
----
-
-## 10. Essential Docker CLI Reference
-
-### Image Operations
-* `docker build -t app:v1.0 .` — Build image from Dockerfile in current directory.
-* `docker images` — List all local images with sizes and tags.
-* `docker tag app:v1.0 myrepo/app:v1.0` — Tag image for remote registry repository.
-* `docker push myrepo/app:v1.0` — Upload tagged image to remote registry.
-* `docker pull myrepo/app:v1.0` — Download image from remote registry.
-* `docker rmi app:v1.0` — Remove local image by name or ID.
-* `docker history app:v1.0` — Inspect layer history and build commands.
-
-### Container Operations
-* `docker run -d -p 80:80 --name web nginx:alpine` — Run container in detached mode with port forwarding.
+### Container Lifecycle
+* `docker run -d -p 80:3000 --name web app:v1` — Run container in detached mode with port mapping.
 * `docker ps` — List running containers.
-* `docker ps -a` — List all containers including exited/stopped ones.
-* `docker stop web` — Gracefully stop container (sends `SIGTERM`, waits 10s, then `SIGKILL`).
-* `docker kill web` — Immediately terminate container (sends `SIGKILL`).
-* `docker start web` — Start a previously stopped container.
-* `docker restart web` — Restart container.
-* `docker rm web` — Delete stopped container.
-* `docker rm -f web` — Force remove running container.
+* `docker ps -a` — List all containers (running and stopped).
+* `docker stop <id>` — Send `SIGTERM` followed by `SIGKILL` after 10s.
+* `docker rm -f <id>` — Force remove running container.
+* `docker restart <id>` — Restart container.
 
-### System Maintenance
-* `docker system df` — Display Docker disk usage breakdown across images, containers, and volumes.
-* `docker system prune -a --volumes -f` — Nuclear cleanup: removes all stopped containers, unused networks, unreferenced images, and unattached volumes.
+### Inspection & Diagnostics
+* `docker logs -f --tail 100 <id>` — Tail live container stdout/stderr logs.
+* `docker exec -it <id> sh` — Open interactive shell inside running container.
+* `docker inspect <id>` — Return complete low-level JSON configuration (IP, mounts, env).
+* `docker stats` — Stream live CPU, Memory, Network, and Block I/O usage for all containers.
+* `docker top <id>` — Display running processes inside container.
 
----
-
-## 11. Production Troubleshooting & Debugging
-
-### Essential Diagnostic Commands
-* `docker logs -f --tail 100 <container>` — Stream real-time container stdout/stderr logs.
-* `docker exec -it <container> sh` — Open interactive shell inside running container for live inspection.
-* `docker inspect <container>` — View detailed low-level JSON configuration (network IPs, mounts, env vars).
-* `docker stats` — Stream live resource utilization metrics (CPU %, Memory %, Network I/O).
-* `docker top <container>` — Display active Linux processes running inside the container namespace.
-
-### Common Production Errors & Fixes
-* **1. Container Exits Immediately (`Exited 0` or `Exited 1`)**:
-  * **Cause**: Container process ran to completion or crashed. Docker containers only stay alive as long as their PID 1 process is running.
-  * **Fix**: Ensure background services (e.g., Nginx) run with `daemon off;` or pass foreground commands.
-* **2. `OOMKilled` (Out of Memory Error - Code 137)**:
-  * **Cause**: Container exceeded assigned cgroup memory limit (`--memory="512m"`).
-  * **Fix**: Inspect memory leak using `docker stats` and increase cgroup memory allocation.
-* **3. `Port Already Allocated`**:
-  * **Cause**: Host port is already bound to another local service or container.
-  * **Fix**: Identify binding using `netstat -tulnp | grep <port>` or map to a different host port.
+### Networks & Volumes
+* `docker network ls` — List all networks.
+* `docker network inspect <net_name>` — Inspect connected containers and subnet details.
+* `docker volume ls` — List all named volumes.
+* `docker volume inspect <vol_name>` — View exact storage mount path on host.
 
 ---
 
-## 12. Docker vs containerd vs Kubernetes
+## 12. Production Troubleshooting Playbook
 
-### Architectural Relationship
-```text
-┌─────────────────────────────────────────────────────────────┐
-│                       Kubernetes                            │
-│                 (Container Orchestration)                   │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ CRI (Container Runtime Interface)
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                       containerd                            │
-│                 (Core Container Runtime)                    │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ OCI Spec
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                         runc                                │
-│           (Spawns Linux Namespaces & cgroups)               │
-└─────────────────────────────────────────────────────────────┘
-```
+### Scenario 1: Container Exits Immediately with Exit Code 137
+* **Root Cause**: Linux Kernel **OOM (Out Of Memory) Killer** terminated the container process because it exceeded its allocated memory limit (`--memory`), or host ran out of RAM.
+* **Diagnosis**:
+  * Run `docker inspect <container_id> --format '{{.State.OOMKilled}}'`. Returns `true` if OOM killed.
+  * Check kernel logs: `dmesg -T | grep -i oom`.
+* **Remediation**:
+  * Increase container memory limit (`--memory="1g"`).
+  * Profile application memory leaks using heap dump analysis.
 
-* **Docker**: Full developer toolset including CLI, build engine, Compose, volume drivers, and containerd.
-* **containerd**: Stripped-down core daemon focused strictly on running containers and pulling images.
-* **Why Kubernetes Deprecated Dockershim**:
-  * Kubernetes communicates with runtimes via the Container Runtime Interface (CRI).
-  * Docker lacked CRI support, requiring a complex bridge translation layer (`dockershim`).
-  * Modern Kubernetes talks directly to `containerd` or `CRI-O`, reducing latency and memory overhead.
+### Scenario 2: Container Exits with Exit Code 0
+* **Root Cause**: The foreground process (PID 1) finished execution and exited naturally (e.g., CMD was `echo "hello"` or a background daemon spawned without keeping a foreground process alive).
+* **Remediation**:
+  * Ensure the main process runs in the foreground (e.g., `nginx -g 'daemon off;'` or `tail -f /dev/null` for testing).
+
+### Scenario 3: Container Cannot Reach Database on User-Defined Bridge
+* **Root Cause**: Trying to use `localhost` or default bridge without DNS.
+* **Remediation**:
+  * Ensure both containers are on the **same user-defined bridge network**.
+  * Use the **container service name** as the database host (e.g., `DB_HOST=database`), never `127.0.0.1` or `localhost`.
 
 ---
 
-## 13. Security Hardening & Best Practices
+## 13. Security Hardening Checklist
 
-### Top 7 Enterprise Hardening Rules
-* **1. Never Run as Root (`USER` Directive)**:
-  * Always create and switch to an unprivileged user inside the container to prevent container breakout exploits.
-* **2. Use Minimal Base Images**:
-  * Prefer `alpine`, `slim`, or Google `distroless` images to minimize packages and potential attack vectors.
-* **3. Enforce Read-Only Filesystems**:
-  * Launch containers with `--read-only` flag and mount writable directories via temporary memory (`tmpfs`).
-* **4. Never Bake Secrets into Images**:
-  * Exclude `.env` and secret files using `.dockerignore`. Pass credentials at runtime via secrets managers or orchestrators.
-* **5. Apply Hard Resource Limits**:
-  * Prevent Denial of Service (DoS) by enforcing CPU and memory caps (`--memory="1g" --cpus="1.0"`).
-* **6. Automated Vulnerability Scanning**:
-  * Integrate vulnerability scanners (`docker scout`, `trivy`, or Snyk) directly into CI/CD build pipelines.
-* **7. Drop Linux Capabilities**:
-  * Drop unused kernel permissions using `--cap-drop=ALL --cap-add=NET_BIND_SERVICE`.
+* [ ] **Run as Non-Root**: Always specify `USER <non-root-uid>` in Dockerfile.
+* [ ] **Use Minimal Base Images**: Prefer `alpine` or `distroless` to eliminate attack surface and package vulnerabilities.
+* [ ] **Scan Images for CVEs**: Automate `docker scout cves` in CI/CD before pushing to registry.
+* [ ] **Drop Linux Capabilities**: Run containers with `--cap-drop=ALL --cap-add=NET_BIND_SERVICE`.
+* [ ] **Make Filesystem Read-Only**: Use `--read-only` with explicit tmpfs mounts for temporary directories.
+* [ ] **Do Not Expose Docker Socket**: Never mount `/var/run/docker.sock` inside untrusted containers (grants full root host access!).
+* [ ] **Use Secret Managers**: Never bake passwords, tokens, or private keys into `ENV` or image layers.
 
 ---
 
 ## 14. Senior DevOps Interview Q&A
 
-### Q1: What happens under the hood when you run `docker run`?
-* The Docker Client converts the CLI command into a REST API request sent to the Docker Daemon (`dockerd`).
-* `dockerd` checks local image cache; if missing, pulls image layers from the remote registry.
-* `dockerd` calls `containerd`, which invokes `runc` to request Linux kernel primitives.
-* The Linux kernel provisions isolated Namespaces (PID, Mount, Net) and cgroups (CPU, RAM).
-* OverlayFS mounts read-only image layers and stacks a writable container layer on top.
-* The bridge driver allocates a virtual Ethernet pair (`veth`), attaching one end to container and the other to `docker0`.
-* The designated entrypoint process executes as PID 1 inside the container namespace.
+### Q1: What happens under the hood when you run `docker run -d -p 80:80 nginx`?
+* The Docker CLI validates command syntax and sends a REST API request to the `dockerd` daemon over the UNIX socket (`/var/run/docker.sock`).
+* `dockerd` checks local storage for the `nginx` image; if missing, it downloads image layers from Docker Hub.
+* `dockerd` instructs `containerd` to prepare the image root filesystem using the `Overlay2` storage driver.
+* `containerd` uses `containerd-shim` to invoke the OCI runtime (`runc`).
+* `runc` makes Linux kernel system calls to configure **namespaces** (PID, NET, MNT, IPC, UTS) and **cgroups** (CPU, memory).
+* `dockerd` configures a virtual Ethernet pair (`veth`), attaches one end to the `docker0` bridge and the other inside the container's NET namespace as `eth0`.
+* An `iptables` NAT port-forwarding rule is injected on the host: `Host:80 -> Container:80`.
+* The `nginx` process starts as PID 1 inside the container namespace.
 
 ### Q2: Why is the order of instructions in a Dockerfile critical?
 * Docker evaluates instructions top-to-bottom and caches intermediate layers.
 * If a layer changes, that layer and **every single layer below it** must be rebuilt from scratch.
-* **Rule**: Place stable, infrequently changing layers (OS packages, dependency manifests) at the top, and volatile, frequently changing layers (source code) at the very bottom.
+* **Golden Rule**: Place stable, infrequently changing layers (OS packages, dependency manifests `package.json`, `requirements.txt`) at the top, and volatile, frequently changing layers (source code) at the very bottom.
 
 ### Q3: What is the difference between a bind mount and a named volume?
-* **Named Volume**: Managed completely by Docker inside its storage directory. Portable, backed up easily, supports volume plugins, and works across operating systems.
-* **Bind Mount**: Directly maps a specific host directory. Dependent on the host machine filesystem structure; best for local development code reloading.
+* **Named Volume**: Managed completely by Docker inside `/var/lib/docker/volumes`. Portable, backed up easily, supports storage plugins, and works across operating systems.
+* **Bind Mount**: Directly maps an absolute host directory into the container. Dependent on the host machine filesystem structure; best for local development code reloading.
 
 ### Q4: How do you shrink a 1.2GB Docker image down to 50MB?
-* Switch to an Alpine or Distroless base image.
+* Switch from full OS distributions (e.g., `ubuntu`, `debian`) to an Alpine or Distroless base image.
 * Implement a multi-stage Dockerfile to separate the compilation toolchain from the runtime container.
 * Clean package manager caches within the same `RUN` command (e.g., `apt-get clean && rm -rf /var/lib/apt/lists/*`).
-* Ensure a comprehensive `.dockerignore` file prevents `.git`, `node_modules`, and temporary files from being sent to the build context.
+* Ensure a comprehensive `.dockerignore` file prevents `.git`, `node_modules`, test files, and local build outputs from entering the build context.
