@@ -37,6 +37,11 @@ Understanding why the industry shifted from standalone Docker to Docker Swarm an
 └─────────────────────────┘      └─────────────────────────┘      └─────────────────────────┘
 ```
 
+> **💡 Real-World Analogy (Easy to Remember)**:  
+> * **Standalone Docker**: A solo food truck. If the truck engine dies, business stops completely.  
+> * **Docker Swarm**: A small fleet of 3 food trucks coordinated via a group chat. Works okay, but cannot dynamically hire drivers during lunch rush or auto-fix a broken engine.  
+> * **Kubernetes**: An automated airport terminal dispatch system with computerized scheduling, automated backup flights, dynamic gate routing, and self-repairing escalators.
+
 ### 1. Drawbacks of Standalone Docker
 * **Single-Host Limitation**: Containers run bound to a single physical server or virtual machine; cannot pool CPU/RAM across multiple hosts.
 * **No Auto-Healing**: If a container application crashes or the underlying host dies, human operator intervention is required to restart it.
@@ -124,7 +129,8 @@ Understanding why the industry shifted from standalone Docker to Docker Swarm an
 * **`etcd`**:
   * Distributed, highly-consistent key-value storage engine.
   * Stores the entire cluster state, configuration, and secrets.
-  * Uses the **Raft consensus algorithm**; requires an odd number of master nodes (3 or 5) to survive quorum partitions: $	ext{Quorum} = \lfloor N/2 floor + 1$.
+  * Uses the **Raft consensus algorithm**; requires an odd number of master nodes (3 or 5) to survive quorum partitions: $	ext{Quorum} = \lfloor N/2 
+floor + 1$.
 * **`kube-scheduler`**:
   * Responsible for placing unscheduled pods onto optimal worker nodes.
   * Evaluates node filtering (taints, tolerations, resource availability) and scoring (pod affinity/anti-affinity, image locality).
@@ -601,3 +607,48 @@ spec:
 ### Q3: Why is `etcd` sensitive to disk I/O and latency?
 * `etcd` uses the Raft consensus protocol. Every write operation (e.g., updating a pod state) requires a majority quorum of `etcd` peers to acknowledge writing the entry to their Write-Ahead Log (WAL) on disk.
 * High disk write latency causes Raft heartbeat election timeouts, leading to leader thrashing, cluster-wide latency spikes, and transient API Server errors. Production `etcd` nodes must run on dedicated NVMe SSDs with low disk latency.
+
+### Q4: ClusterIP vs NodePort vs LoadBalancer vs Ingress — when do you use each?
+* **ClusterIP**: Internal cluster communication only. Default type. Used for microservice-to-microservice and database connections.
+* **NodePort**: Opens a static port (30000–32767) on every worker node's IP. Used for debugging or legacy on-prem routing.
+* **LoadBalancer**: Provisions a dedicated cloud load balancer (AWS NLB/ALB) per service. Expensive if you have dozens of microservices.
+* **Ingress**: A single Layer 7 reverse proxy/load balancer routing traffic to dozens of internal ClusterIP services based on hostnames (`api.example.com`) and URL paths (`/orders`), with SSL termination.
+
+### Q5: How do you diagnose and resolve a Pod stuck in `CrashLoopBackOff`?
+1. Inspect logs of the container that just crashed: `kubectl logs <pod-name> --previous`.
+2. Inspect exit code and reason via `kubectl describe pod <pod-name>`.
+   * Exit Code `137`: Killed by OOM killer -> increase memory requests/limits.
+   * Exit Code `1`: Application exception (syntax error, missing config/secret, unhandled database timeout).
+   * Exit Code `0`: Completed background command without keeping foreground process running.
+3. Validate linked Secrets and ConfigMaps exist and have correct keys.
+
+### Q6: How do you troubleshoot a Pod stuck in `Pending` state?
+1. Run `kubectl describe pod <pod-name>` and look at `Events` at the bottom.
+2. **Insufficient Resources**: If events say `0/6 nodes available: Insufficient cpu/memory`, worker nodes are overcommitted. Fix: Add worker nodes (scale ASG) or reduce Pod resource requests.
+3. **Taints and Tolerations**: Worker nodes have taints that the Pod does not tolerate.
+4. **Unbound PVC**: If using persistent storage, the PVC is waiting for volume provisioning (`WaitForFirstConsumer`).
+
+### Q7: What is the difference between a Deployment, StatefulSet, and DaemonSet?
+* **Deployment**: For stateless applications (REST APIs, web apps). Pods are interchangeable, have random hashes in names (`web-78dfb9-4k2ln`), and share no unique identities.
+* **StatefulSet**: For stateful workloads (PostgreSQL, Kafka, Elasticsearch). Pods have stable, predictable ordinal names (`db-0`, `db-1`), dedicated persistent volume claims, and ordered graceful rollouts/terminations.
+* **DaemonSet**: Ensures exactly one copy of a Pod runs on every single worker node (or nodes matching nodeSelectors). Used for log collectors (Fluentd, Promtail), node monitoring (node-exporter), and CNI agents (aws-node, Calico).
+
+### Q8: Why are Kubernetes Secrets not secure by default, and how do you secure them in production?
+* **Default Vulnerability**: Kubernetes Secrets are merely **base64-encoded strings**, not encrypted! Anyone with RBAC access to `kubectl get secret -o yaml` can decode them trivially (`base64 -d`). In addition, by default `etcd` stores secrets unencrypted on disk.
+* **Production Hardening**:
+  1. **Encryption at Rest**: Enable KMS envelope encryption in `kube-apiserver` encryption provider config so `etcd` stores ciphertext.
+  2. **External Secrets Operator (ESO)** or **AWS Secrets Manager / HashiCorp Vault**: Sync secrets dynamically from enterprise secret stores into memory.
+  3. **Sealed Secrets**: Encrypt secrets with public key GitOps workflow so they can safely live in Git repositories.
+
+### Q9: What happens when a Worker Node crashes in a Kubernetes cluster?
+1. `kubelet` stops sending periodic heartbeats to `kube-apiserver`.
+2. After `node-monitor-grace-period` (default 40s), the **Node Lifecycle Controller** marks the node `NotReady`.
+3. After `pod-eviction-timeout` (default 5 minutes), the controller initiates eviction of all Pods on that node.
+4. For Deployments, the ReplicaSet controller notices current replicas < desired replicas, and schedules replacement pods onto remaining healthy worker nodes.
+5. For StatefulSets, replacement pods are not rescheduled immediately to avoid data corruption (split-brain) until the node is confirmed dead or deleted.
+
+### Q10: How does the Horizontal Pod Autoscaler (HPA v2) interact with Metrics Server and Resource Requests?
+* HPA requires the **Metrics Server** to query container CPU/RAM utilization from `kubelet`'s Summary API every 15–30 seconds.
+* **Crucial Prerequisite**: HPA computes percentage utilization against the Pod's **`resources.requests`**, NOT `limits`!
+* If a Pod does not have `requests.cpu` defined in its manifest, **HPA cannot calculate utilization and autoscaling fails!**
+* HPA uses the formula: Desired Replicas = ceil(Current Replicas * (Current Metric Value / Target Metric Value)).

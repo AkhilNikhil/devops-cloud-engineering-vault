@@ -42,6 +42,13 @@
 └──────────────────────────────┘       └──────────────────────────────┘
 ```
 
+> **💡 Real-World Car Factory Analogy (Easy to Remember)**:  
+> * **Azure Boards**: The production blueprint and assembly schedule board. Tracks which parts need building.  
+> * **Azure Repos**: The design vault holding technical CAD schematics (source code).  
+> * **Azure Pipelines**: The robotic conveyor belt assembling and painting cars automatically (CI/CD).  
+> * **Azure Test Plans**: The quality control crash-test lab.  
+> * **Azure Artifacts**: The spare parts warehouse supplying standardized bolts and engines (NuGet/npm packages).
+
 ### The 5 Core Azure DevOps Services
 * **1. Azure Boards**: Agile work tracking, Kanban boards, sprint backlogs, team capacity planning, and custom reporting queries.
 * **2. Azure Repos**: Unlimited cloud-hosted private Git repositories with enterprise pull request review policies and branch locks.
@@ -282,3 +289,54 @@ stages:
 ### Q3: How do you prevent credentials from expiring in Azure DevOps Service Connections?
 * Transition from legacy Client Secret authentication to **Workload Identity Federation (OIDC)**.
 * Azure DevOps establishes a trust relationship with Microsoft Entra ID (Azure AD) using cryptographic tokens, completely eliminating passwords, client secrets, and expiration maintenance.
+
+### Q4: How do you configure Azure Key Vault integration with Azure DevOps pipelines without exposing secrets?
+1. In Azure DevOps **Pipelines -> Library**, create a **Variable Group**.
+2. Enable the toggle *"Link secrets from an Azure key vault as variables"*.
+3. Select the Azure subscription service connection and your Key Vault name.
+4. Select the specific secrets to import.
+5. In your `azure-pipelines.yml`, reference the variable group:
+   ```yaml
+   variables:
+     - group: prod-keyvault-secrets
+   ```
+6. The secret is automatically injected as an environment variable and **masked** (redacted with `***`) in all build logs.
+
+### Q5: What are Azure DevOps Branch Policies and what are the essential rules for a production `main` branch?
+1. **Require a minimum number of reviewers**: Set to >= 2 with "Prohibit most recent submitter from approving their own changes".
+2. **Check for linked work items**: Ensures all code commits trace back to an Azure Boards story or bug.
+3. **Build Validation**: Requires a designated PR validation pipeline to successfully build and run unit tests before the merge button is enabled.
+4. **Comment Resolution**: Requires all reviewer discussions to be marked resolved.
+5. **Automatically revoke approvals when new changes are pushed**: Ensures code pushed after an approval is re-reviewed.
+
+### Q6: How do Environments and Approval Gates work in Azure Pipelines?
+* An **Environment** is a logical deployment target (e.g., `production`, `staging`).
+* In YAML, you target an environment inside a `deployment:` job (`environment: 'production'`).
+* In the portal under **Pipelines -> Environments -> Approvals and checks**, you configure:
+  * **Approvals**: Designate lead engineers or release managers whose explicit approval is required before the deployment job starts.
+  * **Business Hours**: Restrict deployments to scheduled release windows.
+  * **Invoke REST API / Azure Function**: Trigger automated health checks or ServiceNow change tickets before proceeding.
+
+### Q7: Explain Canary vs Blue-Green deployment strategies in Azure DevOps.
+* **Blue-Green Deployment**: Two identical production environments exist. Blue serves live traffic; Green receives the new release. Automated tests run against Green. If successful, traffic is swapped (via Azure Traffic Manager or App Service Deployment Slots) from Blue to Green with zero downtime.
+* **Canary Deployment**: The new version is released to a small subset of servers or users (e.g. 10% traffic). The system monitors error rates, telemetry, and CPU metrics. If healthy, the percentage is gradually incremented to 25%, 50%, and 100%. If errors spike, traffic immediately rolls back.
+
+### Q8: What is the purpose of Pipeline Templates and how do they enforce security across enterprise repositories?
+* Templates allow teams to define reusable steps, jobs, or entire stages in a central governance repository.
+* Individual project pipelines reference the template:
+  ```yaml
+  stages:
+    - template: security-scan-template.yml@templates-repo
+  ```
+* **Security Enforcement**: Central DevOps teams can mandate required security scans (SonarQube, Prisma Cloud, Docker Scout) across all company projects by requiring all pipelines to extend from a base compliance template.
+
+### Q9: How do you troubleshoot a self-hosted agent job that is stuck in the queue?
+1. Verify the agent service status on the host VM (`sudo ./svc.sh status`).
+2. Check **Agent Pool Settings** in Azure DevOps to ensure the agent is listed as **Online** and **Enabled**.
+3. Inspect **Demands vs Capabilities**: Verify that the pipeline's `demands:` block (e.g. `npm`, `docker`, `maven`) matches user-defined or system capabilities configured on the self-hosted agent.
+4. Ensure the agent is not currently busy running another long-running single-threaded job if the pool has only 1 parallel agent.
+
+### Q10: How do Azure Artifacts Upstream Sources protect enterprise CI/CD pipelines from external package outages?
+* When using public package feeds directly (`npmjs.com`, `nuget.org`, `pypi.org`), builds fail if the public registry experiences downtime or if a maintainer deletes a package.
+* **Upstream Sources**: When an engineer or pipeline installs a package through an Azure Artifacts feed with upstream sources enabled, the feed downloads and **saves an immutable copy of that package version directly inside your private Azure Artifacts feed**.
+* Subsequent builds download the cached package directly from your private feed, ensuring lightning-fast build speeds and 100% resilience against external registry outages.

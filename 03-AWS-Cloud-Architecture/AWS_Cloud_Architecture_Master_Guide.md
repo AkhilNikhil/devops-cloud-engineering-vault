@@ -36,6 +36,12 @@
   * Integrates on-premises private infrastructure with public cloud environments via AWS Direct Connect or Site-to-Site VPN.
   * Enables **Cloud Bursting**: baseline workloads run on-premise, while temporary seasonal traffic spikes overflow dynamically into AWS.
 
+> **💡 Real-World Pizza Analogy (Easy to Remember)**:  
+> * **On-Premise (Traditional IT)**: Making pizza from scratch at home. You buy the flour, make the dough, maintain the oven, provide the dining table, and wash the dishes.  
+> * **IaaS (Infrastructure as a Service - AWS EC2)**: Buying frozen pizza dough and cheese. The grocery store manages the ingredients, but you bake it in your oven and serve it.  
+> * **PaaS (Platform as a Service - AWS Elastic Beanstalk / RDS)**: Pizza delivery to your home. They make and bake the pizza; you just provide the dining room table and eat.  
+> * **SaaS (Software as a Service - Microsoft 365 / Gmail)**: Dining out at a pizzeria. You walk in, eat, pay, and leave. You manage zero infrastructure.
+
 ### Cloud Service Models Comparison
 
 ```text
@@ -55,6 +61,11 @@
 ## 2. Global Infrastructure: Regions, AZs, & Edge Locations
 
 Understanding the physical topology of AWS is essential for high-availability architectural design.
+
+> **💡 Simple Analogy (Easy to Remember)**:  
+> * **Region**: A metropolitan city (e.g., Mumbai).  
+> * **Availability Zone (AZ)**: Standalone bank branch buildings in different neighborhoods of Mumbai (e.g., Bandra, Nariman Point, Andheri). If one building has a power outage, the other two continue operating normally.  
+> * **Edge Location**: Small local ATM kiosks on every street corner. You don't need to visit the main branch just to withdraw cash.
 
 ### 1. AWS Region
 * A separate geographic area (e.g., `us-east-1` in N. Virginia, `ap-south-1` in Mumbai).
@@ -172,6 +183,10 @@ Unlike traditional on-premise networking which reserves only 2 IPs per subnet, *
 │   └─────────────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
+
+> **💡 Simple Analogy (Easy to Remember)**:  
+> * **Internet Gateway (IGW)**: A building's double glass revolving front doors. Anyone can walk in from outside, and tenants can walk out.  
+> * **NAT Gateway**: A one-way emergency security exit door. Tenants inside the building can push through to go outside, but nobody on the street can enter through it.
 
 ### 1. Internet Gateway (IGW)
 * Horizontally scaled, highly available VPC component that enables two-way communication between instances in your VPC and the internet.
@@ -394,3 +409,43 @@ Amazon S3 is a serverless, highly durable (99.999999999% - 11 9's durability) ob
 ### Q3: What is the difference between AWS Security Group statefulness and NACL statelessness?
 * **Security Group (Stateful)**: When inbound traffic is permitted on port 443, return outbound traffic is automatically permitted on the ephemeral port, regardless of outbound rules.
 * **NACL (Stateless)**: If inbound traffic is allowed on port 443, return outbound traffic must be explicitly permitted in the outbound rules table on ephemeral ports (`1024-65535`).
+
+### Q4: Why is AWS Systems Manager (SSM) Session Manager preferred over standard SSH keys for EC2 administration?
+1. **Zero Open Inbound Ports**: Does not require port 22 to be open in Security Groups.
+2. **No Public IP or Bastion Host Needed**: EC2 instances in completely private subnets can be reached securely via SSM agent communicating outbound to AWS SSM endpoints.
+3. **No Private Key Sprawl**: Eliminates the risk of managing, sharing, or leaking `.pem` SSH key files.
+4. **Complete Audit Trail**: Every session, keystroke, and CLI command executed is logged to AWS CloudWatch Logs and S3, with IAM role-based access control.
+
+### Q5: What is IMDSv2 and how does it prevent SSRF (Server-Side Request Forgery) attacks on EC2?
+* In IMDSv1, an attacker exploiting an SSRF vulnerability in a web app could force the server to execute a simple HTTP GET request to `http://169.254.169.254/latest/meta-data/iam/security-credentials/` and exfiltrate IAM role credentials.
+* IMDSv2 introduces **session-oriented protection**:
+  1. The client must first send a `PUT` request with header `X-aws-ec2-metadata-token-ttl-seconds: 21600` to retrieve an encrypted session token.
+  2. Most HTTP SSRF exploit vectors cannot forge custom HTTP `PUT` requests or inject custom request headers.
+  3. The token must then be supplied in subsequent `GET` requests via the `X-aws-ec2-metadata-token` header.
+
+### Q6: How does EBS gp3 differ from gp2, and how do EBS Snapshots work under the hood?
+* **gp3 vs gp2**: In gp2, baseline IOPS and throughput were tied to volume size (3 IOPS per GB). In gp3, baseline performance is 3,000 IOPS and 125 MB/s regardless of volume size, and you can scale IOPS and throughput independently without paying for unwanted disk space. gp3 is also 20% cheaper.
+* **EBS Snapshots**: Snapshots are point-in-time, incremental block-level backups stored across multiple AZs in Amazon S3. Only blocks changed since the previous snapshot are copied. Deleting an intermediate snapshot merges unchanged blocks into subsequent snapshots automatically.
+
+### Q7: Explain RDS Multi-AZ synchronous replication vs Read Replicas (asynchronous).
+* **RDS Multi-AZ**: High availability and disaster recovery feature. Synchronously replicates every write transaction to a standby database instance in a different AZ. Standby is passive and cannot serve read traffic. Automatic DNS failover takes 60–120s.
+* **Read Replicas**: Scalability feature. Asynchronously replicates data to offload read queries (BI dashboards, reporting). Up to 15 read replicas can be deployed within the same AZ, across AZs, or across AWS Regions. Can be promoted to independent standalone databases.
+
+### Q8: What is the difference between an Application Load Balancer (ALB) and a Network Load Balancer (NLB)?
+* **ALB (Layer 7)**: Inspects HTTP/HTTPS headers, cookies, URL paths (`/api`), and domain hostnames. Supports redirect rules, TLS termination, and WebSockets. IP addresses are dynamic.
+* **NLB (Layer 4)**: Operates at the transport layer (raw TCP, UDP, TLS). Does not inspect application payloads. Capable of handling tens of millions of requests per second with sub-millisecond latency. Supports **static Elastic IP addresses** per AZ and preserves client source IP natively without `X-Forwarded-For`.
+
+### Q9: How do S3 Lifecycle policies and Cross-Region Replication (CRR) work together for disaster recovery?
+* **Cross-Region Replication (CRR)**: Asynchronously replicates objects, tags, and metadata from a source bucket (e.g. `us-east-1`) to a destination bucket in a separate region (e.g. `ap-south-1`) for geographic compliance and business continuity.
+* **Lifecycle Policies**: Transition older objects through cheaper storage classes over time (`Standard` -> `Standard-IA` after 30 days -> `Glacier Flexible Retrieval` after 90 days -> `Glacier Deep Archive` after 180 days -> `Expiration` after 365 days) to drastically minimize storage costs while maintaining audit compliance.
+
+### Q10: How do you resolve asymmetric routing or traffic drops when configuring an Internet Gateway and a NAT Gateway in a VPC?
+* **Problem**: EC2 instances in private subnets cannot communicate with the internet if their route table points `0.0.0.0/0` to an Internet Gateway without an assigned public IP, or if NAT Gateway is mistakenly placed in a private subnet.
+* **Architectural Fix**:
+  1. **NAT Gateway placement**: A NAT Gateway **must be placed in a Public Subnet** that has an active route `0.0.0.0/0 -> igw-xxxxxxxxx` and an allocated Elastic IP (EIP).
+  2. **Private Route Table**: Private subnets must have a route table where `0.0.0.0/0 -> nat-xxxxxxxxx`.
+  3. Traffic flow: `Private EC2 -> NAT Gateway (in public subnet) -> Internet Gateway -> Internet`.
+
+### Q11: What is the architectural difference between a Security Group and a Network ACL (NACL)?
+* **Security Group**: Operates at the virtual network interface (ENI) level. **Stateful**: If inbound traffic is allowed on port 443, outbound response traffic is dynamically permitted regardless of outbound rules. Supports ALLOW rules only.
+* **NACL**: Operates as a firewall around the subnet boundary. **Stateless**: Inbound and outbound rules are evaluated independently. Outbound rules must explicitly permit the return traffic to ephemeral client ports (1024–65535). Supports both ALLOW and DENY rules in numbered priority order.

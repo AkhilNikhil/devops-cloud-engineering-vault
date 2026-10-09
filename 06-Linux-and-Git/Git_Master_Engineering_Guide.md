@@ -149,6 +149,9 @@ Main: X ──► Y ──► Z ──► A' ──► B' ──► C' (Zero Mer
 
 ## 7. Advanced Power Tools: Stash, Cherry-Pick, & Squashing
 
+> **💡 Simple Analogy (Easy to Remember)**:  
+> A desk drawer. You are halfway through writing code, but your manager calls with an urgent production bug. You toss your half-finished work into the desk drawer (`git stash`), fix the bug on `main`, and then pull your work back out of the drawer (`git stash pop`).
+
 ### 1. `git stash` (Temporary Shelf)
 * `git stash` — Saves modified working directory state and reverts to clean HEAD.
 * `git stash list` — List all stashed changes.
@@ -195,3 +198,50 @@ Main: X ──► Y ──► Z ──► A' ──► B' ──► C' (Zero Mer
 ### Q2: How does `git reflog` allow you to recover a permanently deleted branch?
 * Git never immediately deletes commits from disk; it simply removes the reference pointer.
 * `git reflog` retains an audit log of all HEAD pointer movements for 30–90 days. Finding the commit hash where the branch tip resided allows running `git checkout -b recovered-branch <commit-hash>`, restoring the branch completely.
+
+### Q3: What is the difference between `git merge` and `git rebase`?
+* **`git merge`**: Creates a merge commit that joins two divergent branches. Preserves exact chronological history and the context of feature branch development.
+* **`git rebase`**: Takes commits from the current branch and replays them one by one on top of the target branch's latest commit. Rewrites commit hashes to produce a clean, linear, single-stream commit history without merge bubbles.
+* **Golden Rule**: Never rebase commits that have been pushed to a public/shared repository.
+
+### Q4: Explain the differences between `git reset --soft`, `--mixed`, and `--hard`.
+* **`--soft`**: Moves HEAD pointer back to the specified commit. Leaves the index (Staging Area) and Working Directory untouched. All changes remain staged and ready for a new commit.
+* **`--mixed` (Default)**: Moves HEAD pointer back and resets the index (Staging Area). Leaves the Working Directory untouched. Changes remain on disk as modified, unstaged files.
+* **`--hard`**: Moves HEAD, clears the index, and overwrites the Working Directory to match the specified commit. All uncommitted changes and unreferenced commits are permanently discarded.
+
+### Q5: What is a detached HEAD state in Git, and how do you fix it?
+* **Cause**: Occurs when you checkout an arbitrary commit hash, tag, or remote branch directly (`git checkout a1b2c3d`) instead of a local branch name. HEAD now points directly to a commit rather than a branch reference.
+* **Risk**: Any new commits created in this state will become orphaned and eligible for garbage collection (`git gc`) once you switch branches.
+* **Fix**: Save work by creating a new branch directly from the current detached HEAD: `git switch -c new-feature-branch`.
+
+### Q6: What is `git cherry-pick`, and what are its production use cases?
+* `git cherry-pick <commit-hash>` applies the exact changes from a specific commit on another branch onto your current checked-out branch as a brand new commit.
+* **Use Cases**:
+  1. Hotfixing production: A bug fix was committed to `develop`, but production (`main`) needs that specific fix immediately without releasing other unapproved features.
+  2. Recovering an accidental commit made on the wrong branch.
+
+### Q7: How does Git store data under the hood (`.git/objects`)?
+* Git is a content-addressable key-value object store. Every object is compressed with zlib and addressed by the 40-character SHA-1 (or SHA-256) hash of its contents:
+  1. **Blob**: Stores raw file contents (no metadata or file names).
+  2. **Tree**: Represents a directory. Stores file names, file permissions, and links to blobs or sub-trees.
+  3. **Commit**: Points to a top-level Tree object, author/committer metadata, timestamp, commit message, and parent commit hash(es).
+  4. **Annotated Tag**: A permanent pointer to a specific commit containing tagger name and PGP signature.
+
+### Q8: What is `git stash` and how do you stash untracked or ignored files?
+* `git stash` takes your uncommitted modifications (both staged and unstaged) and saves them on an internal LIFO stack, reverting your working directory to clean `HEAD`.
+* By default, `git stash` ignores untracked files and `.gitignore` files.
+* To include untracked files: `git stash -u` (or `--include-untracked`).
+* To include all files including ignored build artifacts: `git stash -a` (or `--all`).
+
+### Q9: How do you identify which commit introduced a bug using `git bisect`?
+* `git bisect` uses binary search to quickly locate the exact commit that introduced a defect:
+  1. Start bisect: `git bisect start`.
+  2. Mark current broken state: `git bisect bad`.
+  3. Mark known good commit from last week: `git bisect good <commit-hash>`.
+  4. Git automatically checks out the midpoint commit. Test the application.
+  5. If working, type `git bisect good`; if broken, type `git bisect bad`.
+  6. Git pinpoints the offending commit in binary search steps. End with `git bisect reset`.
+
+### Q10: How do you clean up and prune stale remote tracking branches locally?
+* When teammates delete feature branches on GitHub/GitLab, your local repository still retains references (`origin/feature-xyz`).
+* Run `git fetch --prune` (or `git remote prune origin`) to delete local tracking references to branches that no longer exist on the remote repository.

@@ -34,6 +34,10 @@
 * **Declarative Approach**: Define cloud resources (AWS, Azure, GCP) using human-readable HashiCorp Configuration Language (HCL).
 * **Automated Lifecycle**: Manages full resource lifecycles—provisioning, modifying, and tearing down infrastructure through code.
 
+> **💡 Real-World Blueprint Analogy (Easy to Remember)**:  
+> * **Manual Cloud Management**: Hiring bricklayers and verbally telling them on-site where to put each window and pipe. Every time you build a new branch office, you have to remember and explain it again, making mistakes every time.  
+> * **Terraform (IaC)**: Drawing an exact architectural CAD blueprint. You feed the blueprint into an automated 3D builder machine. It scans the ground, sees what is already built, builds only what is missing, and produces an identical building in London, New York, or Tokyo with 100% precision.
+
 ### Why DevOps Teams Use Terraform
 * **Before Terraform (Manual Provisioning)**:
   * Engineers clicked through web consoles (AWS Management Console, Azure Portal).
@@ -824,6 +828,47 @@ resource "aws_s3_bucket" "app_data" {
 ### Q5: How does Terraform determine the order of resource creation?
 * **Implicit Dependencies**: Terraform analyzes resource attribute references (e.g., `subnet_id = aws_subnet.public.id`) and builds a directed acyclic graph (DAG) automatically.
 * **Explicit Dependencies**: Use `depends_on = [aws_resource.target]` when dependencies exist outside of direct attribute references (e.g., waiting for an IAM role policy attachment to propagate before launching an EC2 instance).
+
+---
+
+### Q6: What is Configuration Drift and how does Terraform detect and remediate it?
+* **Drift** occurs when a cloud resource is modified out-of-band (e.g., an engineer changes an EC2 security group rule manually in the AWS Console).
+* During `terraform plan` or `terraform apply`, Terraform executes a **Refresh** phase, making read API calls to the cloud provider to fetch current live state.
+* It compares live state against declared code and shows a plan diff to revert the drifted changes back to the declared configuration.
+
+### Q7: How do you import pre-existing manually created infrastructure into Terraform (CLI vs Modern 1.5+ `import` block)?
+* **Traditional CLI**: `terraform import aws_vpc.main vpc-0a1b2c3d4e` (requires authoring matching resource block first).
+* **Modern Terraform 1.5+**: Use the declarative `import` block in code:
+  ```hcl
+  import {
+    to = aws_security_group.web
+    id = "sg-0123456789abcdef0"
+  }
+  ```
+  Running `terraform plan -generate-config-out=generated.tf` will automatically generate the matching HCL code.
+
+### Q8: How do you safely rename or refactor resources in Terraform without triggering a destroy-and-recreate cycle?
+* **Modern Standard**: Use the `moved` block in your configuration:
+  ```hcl
+  moved {
+    from = aws_instance.old_name
+    to   = aws_instance.new_name
+  }
+  ```
+* This tracks the refactor directly in Git. When teammates or CI/CD run `terraform apply`, Terraform updates state metadata without recreating the physical resource.
+
+### Q9: What is the difference between `terraform refresh`, `terraform plan`, and `terraform apply -refresh-only`?
+* `terraform refresh`: (Deprecated standalone) queries cloud APIs and updates `terraform.tfstate` directly without reviewing changes.
+* `terraform plan`: Refreshes in-memory state, compares with code, and outputs a proposed execution plan without modifying state or cloud resources.
+* `terraform apply -refresh-only`: Safely updates the state file to reflect external out-of-band changes without applying any new code modifications.
+
+### Q10: How do you recover from a corrupted or locked Terraform state file in production?
+* **Stuck Lock**: If a CI/CD pipeline aborted abruptly and left a lock:
+  1. Inspect Lock ID from error message.
+  2. Run `terraform force-unlock <LOCK-ID>`.
+* **State Corruption**:
+  1. S3 bucket versioning allows immediate rollback to the previous version of `terraform.tfstate`.
+  2. Use `terraform state rm <resource>` to remove a corrupted or non-existent resource from tracking without destroying other resources.
 
 ---
 
